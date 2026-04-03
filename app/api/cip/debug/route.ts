@@ -5,18 +5,38 @@ export async function GET() {
   const steps: Record<string, unknown> = {};
 
   try {
-    // Step 1: Get token
     const token = await getGraphToken();
     steps.token = "OK";
 
-    // Step 2: Get site
-    const site = await graphFetch(
-      `/sites/chrsolutionsinc649.sharepoint.com:/sites/CIPCenter`,
-      token
-    );
-    steps.site = { id: site.id, name: site.displayName };
+    // Try alternate site lookup using hostname + path
+    let site;
+    try {
+      site = await graphFetch(
+        `/sites/chrsolutionsinc649.sharepoint.com:/sites/CIPCenter:`,
+        token
+      );
+      steps.site = { id: site.id, name: site.displayName };
+    } catch (e1) {
+      steps.site_attempt1 = e1 instanceof Error ? e1.message : String(e1);
 
-    // Step 3: List all lists on the site
+      // Fallback: search for site by name
+      try {
+        const search = await graphFetch(`/sites?search=CIPCenter`, token);
+        steps.site_search = search.value?.map((s: { id: string; displayName: string; webUrl: string }) => ({
+          id: s.id,
+          name: s.displayName,
+          url: s.webUrl,
+        }));
+        site = search.value?.[0];
+      } catch (e2) {
+        steps.site_attempt2 = e2 instanceof Error ? e2.message : String(e2);
+        throw new Error("Cannot access SharePoint site — ensure Sites.Read.All permission is granted with admin consent in Azure");
+      }
+    }
+
+    if (!site?.id) throw new Error("Site not found");
+
+    // List all lists
     const lists = await graphFetch(`/sites/${site.id}/lists`, token);
     steps.lists = lists.value.map((l: { displayName: string; id: string }) => ({
       name: l.displayName,
