@@ -2,6 +2,7 @@ const TENANT_ID = process.env.AZURE_TENANT_ID!;
 const CLIENT_ID = process.env.AZURE_CLIENT_ID!;
 const CLIENT_SECRET = process.env.AZURE_CLIENT_SECRET!;
 
+// App-only token (client credentials) — used when no user token is available
 export async function getGraphToken(): Promise<string> {
   const url = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`;
 
@@ -27,7 +28,13 @@ export async function getGraphToken(): Promise<string> {
   return data.access_token;
 }
 
-export async function graphFetch(endpoint: string, token: string) {
+// Unified Graph fetch — uses delegated user token if provided, else app-only token
+export async function graphFetch(
+  endpoint: string,
+  tokenOrNull?: string | null
+): Promise<unknown> {
+  const token = tokenOrNull ?? (await getGraphToken());
+
   const res = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
     headers: {
       Authorization: `Bearer ${token}`,

@@ -16,6 +16,7 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  msAccessToken: string | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
   loginWithMicrosoft: () => Promise<void>;
@@ -29,6 +30,8 @@ microsoftProvider.setCustomParameters({
   tenant: process.env.NEXT_PUBLIC_AZURE_TENANT_ID ?? "common",
   prompt: "select_account",
 });
+microsoftProvider.addScope("Sites.Read.All");
+microsoftProvider.addScope("Files.Read.All");
 
 async function upsertUserDoc(user: User) {
   await setDoc(
@@ -46,11 +49,14 @@ async function upsertUserDoc(user: User) {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [msAccessToken, setMsAccessToken] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
+      // Clear MS token on sign-out
+      if (!user) setMsAccessToken(null);
     });
     return unsubscribe;
   }, []);
@@ -72,15 +78,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithMicrosoft = async () => {
     const result = await signInWithPopup(auth, microsoftProvider);
+    // Extract delegated access token from Microsoft OAuth result
+    const credential = OAuthProvider.credentialFromResult(result);
+    if (credential?.accessToken) {
+      setMsAccessToken(credential.accessToken);
+    }
     await upsertUserDoc(result.user);
   };
 
   const logout = async () => {
     await signOut(auth);
+    setMsAccessToken(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, loginWithMicrosoft, logout }}>
+    <AuthContext.Provider value={{ user, loading, msAccessToken, login, signup, loginWithMicrosoft, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -13,41 +13,49 @@ export interface CIPRecord {
 
 async function getSiteId(token: string): Promise<string> {
   const data = await graphFetch(
-    `/sites/${SHAREPOINT_HOST}:${SITE_PATH}`,
+    `/sites/${SHAREPOINT_HOST}:${SITE_PATH}:`,
     token
-  );
+  ) as { id: string };
   return data.id;
 }
 
 async function getListId(siteId: string, listName: string, token: string): Promise<string> {
-  const data = await graphFetch(`/sites/${siteId}/lists`, token);
+  const data = await graphFetch(`/sites/${siteId}/lists`, token) as {
+    value: { displayName: string; id: string }[];
+  };
   const list = data.value.find(
-    (l: { displayName: string; id: string }) =>
-      l.displayName.toLowerCase() === listName.toLowerCase()
+    (l) => l.displayName.toLowerCase() === listName.toLowerCase()
   );
   if (!list) throw new Error(`List "${listName}" not found on SharePoint site`);
   return list.id;
 }
 
-export async function fetchCIPRecords(listName = "CIP"): Promise<CIPRecord[]> {
-  const token = await getGraphToken();
+export async function fetchCIPRecords(
+  listName = "CIP",
+  userToken?: string | null
+): Promise<CIPRecord[]> {
+  // Use delegated user token if available, otherwise fall back to app-only token
+  const token = userToken ?? (await getGraphToken());
+
   const siteId = await getSiteId(token);
   const listId = await getListId(siteId, listName, token);
 
   const data = await graphFetch(
     `/sites/${siteId}/lists/${listId}/items?expand=fields(select=Title,CIPType,CIPStatus,SubmissionDate)&$top=100`,
     token
-  );
+  ) as {
+    value: {
+      id: string;
+      fields: {
+        Title?: string;
+        CIPType?: string;
+        CIPStatus?: string;
+        SubmissionDate?: string;
+      };
+    }[];
+  };
 
-  return data.value.map((item: {
-    id: string;
-    fields: {
-      Title?: string;
-      CIPType?: string;
-      CIPStatus?: string;
-      SubmissionDate?: string;
-    };
-  }) => ({
+  return data.value.map((item) => ({
     id: item.id,
     chrTicketNumbers: item.fields.Title ?? "",
     cipType: item.fields.CIPType ?? "",

@@ -6,7 +6,7 @@ import { addNote, getNotes, updateNote, deleteNote, Note } from "@/lib/firestore
 import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
-  const { user, logout, loading } = useAuth();
+  const { user, logout, loading, msAccessToken } = useAuth();
   const router = useRouter();
   const [notes, setNotes] = useState<Note[]>([]);
   const [title, setTitle] = useState("");
@@ -30,7 +30,7 @@ export default function Dashboard() {
     setNotes(data);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
     if (!user || !title.trim()) return;
     setSaving(true);
