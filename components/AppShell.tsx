@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import GlobalSearch from "@/components/GlobalSearch";
 
 interface NavItem {
   label: string;
@@ -160,18 +161,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Topbar */}
-        <header className="flex items-center gap-4 px-6 py-4 border-b border-gray-800 bg-gray-950 shrink-0">
+        <header className="flex items-center gap-4 px-6 py-3 border-b border-gray-800 bg-gray-950 shrink-0">
           <button className="lg:hidden text-gray-400 hover:text-white" onClick={() => setSidebarOpen(true)}>
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
           </button>
-          <h1 className="text-lg font-semibold text-white">{pageTitle}</h1>
+          <h1 className="text-lg font-semibold text-white shrink-0">{pageTitle}</h1>
+
+          {/* Global search */}
+          <div className="flex-1 max-w-sm mx-4">
+            <GlobalSearch />
+          </div>
+
           <div className="ml-auto flex items-center gap-3">
             <div className="hidden sm:block text-right">
               <p className="text-xs text-gray-500">{user?.email}</p>
             </div>
-            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white">
+            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
               {initials}
             </div>
           </div>

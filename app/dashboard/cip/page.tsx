@@ -29,7 +29,6 @@ export default function CIPPage() {
   const [lastSynced, setLastSynced]     = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterType, setFilterType]     = useState("");
-  const [search, setSearch]             = useState("");
   const [debugResult, setDebugResult]   = useState<string | null>(null);
 
   // Pagination
@@ -39,7 +38,7 @@ export default function CIPPage() {
   useEffect(() => { fetchCIPRecords(); }, []);
 
   // Reset to page 1 whenever filters change
-  useEffect(() => { setPage(1); }, [filterStatus, filterType, search]);
+  useEffect(() => { setPage(1); }, [filterStatus, filterType]);
 
   const authHeaders = (): Record<string, string> =>
     msAccessToken ? { Authorization: `Bearer ${msAccessToken}` } : {};
@@ -105,15 +104,9 @@ export default function CIPPage() {
   const uniqueTypes    = [...new Set(cipRecords.map((r) => r.cipType).filter(Boolean))];
 
   const filteredCIP = cipRecords.filter((r) => {
-    const q = search.toLowerCase();
-    const matchSearch = q
-      ? r.chrTicketNumbers.toLowerCase().includes(q) ||
-        r.cipType.toLowerCase().includes(q) ||
-        r.cipStatus.toLowerCase().includes(q)
-      : true;
     const matchStatus = filterStatus ? r.cipStatus.toLowerCase() === filterStatus.toLowerCase() : true;
     const matchType   = filterType   ? r.cipType.toLowerCase()   === filterType.toLowerCase()   : true;
-    return matchSearch && matchStatus && matchType;
+    return matchStatus && matchType;
   });
 
   const totalPages  = Math.max(1, Math.ceil(filteredCIP.length / pageSize));
@@ -130,20 +123,6 @@ export default function CIPPage() {
     <div>
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        {/* Search */}
-        <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="bg-gray-800 border border-gray-700 text-sm text-white rounded-lg pl-9 pr-4 py-2 w-48 focus:outline-none focus:border-indigo-500 placeholder-gray-600"
-          />
-        </div>
-
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
