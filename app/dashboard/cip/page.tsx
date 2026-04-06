@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { CIPRecord } from "@/lib/cip";
-import StatusFilter from "@/components/StatusFilter";
+import FilterDropdown from "@/components/FilterDropdown";
 
 const STATUS_COLORS: Record<string, string> = {
   open:          "bg-blue-900/40 text-blue-300",
@@ -101,8 +101,23 @@ export default function CIPPage() {
     }
   };
 
+  const STATUS_DOTS: Record<string, string> = {
+    open:          "bg-blue-400",
+    "in progress": "bg-yellow-400",
+    completed:     "bg-green-400",
+    closed:        "bg-gray-500",
+  };
+
   const uniqueStatuses = [...new Set(cipRecords.map((r) => r.cipStatus).filter(Boolean))];
   const uniqueTypes    = [...new Set(cipRecords.map((r) => r.cipType).filter(Boolean))];
+
+  const statusOptions = uniqueStatuses.map((s) => ({
+    value: s,
+    label: s,
+    dot: STATUS_DOTS[s.toLowerCase()] ?? "bg-gray-500",
+  }));
+
+  const typeOptions = uniqueTypes.map((t) => ({ value: t, label: t }));
 
   const filteredCIP = cipRecords.filter((r) => {
     const matchStatus = filterStatus ? r.cipStatus.toLowerCase() === filterStatus.toLowerCase() : true;
@@ -124,20 +139,19 @@ export default function CIPPage() {
     <div>
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <StatusFilter
-          statuses={uniqueStatuses}
+        <FilterDropdown
+          label="Status"
+          options={statusOptions}
           value={filterStatus}
           onChange={setFilterStatus}
         />
 
-        <select
+        <FilterDropdown
+          label="CIP Type"
+          options={typeOptions}
           value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-          className="bg-gray-800 border border-gray-700 text-sm text-white rounded-lg px-3 py-2 focus:outline-none"
-        >
-          <option value="">All Types</option>
-          {uniqueTypes.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
+          onChange={setFilterType}
+        />
 
         <div className="ml-auto flex items-center gap-3">
           {lastSynced && <span className="text-xs text-gray-500">Last synced: {lastSynced}</span>}
