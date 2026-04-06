@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { CIPRecord } from "@/lib/cip";
 import FilterDropdown from "@/components/FilterDropdown";
+import DateRangeFilter, { DateRange } from "@/components/DateRangeFilter";
 
 const STATUS_COLORS: Record<string, string> = {
   open:          "bg-blue-900/40 text-blue-300",
@@ -30,6 +31,7 @@ export default function CIPPage() {
   const [lastSynced, setLastSynced]     = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterType, setFilterType]     = useState("");
+  const [dateRange, setDateRange]       = useState<DateRange>({ from: "", to: "" });
   const [debugResult, setDebugResult]   = useState<string | null>(null);
 
   // Pagination
@@ -39,7 +41,7 @@ export default function CIPPage() {
   useEffect(() => { fetchCIPRecords(); }, []);
 
   // Reset to page 1 whenever filters change
-  useEffect(() => { setPage(1); }, [filterStatus, filterType]);
+  useEffect(() => { setPage(1); }, [filterStatus, filterType, dateRange]);
 
   const authHeaders = (): Record<string, string> =>
     msAccessToken ? { Authorization: `Bearer ${msAccessToken}` } : {};
@@ -122,7 +124,10 @@ export default function CIPPage() {
   const filteredCIP = cipRecords.filter((r) => {
     const matchStatus = filterStatus ? r.cipStatus.toLowerCase() === filterStatus.toLowerCase() : true;
     const matchType   = filterType   ? r.cipType.toLowerCase()   === filterType.toLowerCase()   : true;
-    return matchStatus && matchType;
+    const recDate     = r.submissionDate ? r.submissionDate.slice(0, 10) : "";
+    const matchFrom   = dateRange.from ? recDate >= dateRange.from : true;
+    const matchTo     = dateRange.to   ? recDate <= dateRange.to   : true;
+    return matchStatus && matchType && matchFrom && matchTo;
   });
 
   const totalPages  = Math.max(1, Math.ceil(filteredCIP.length / pageSize));
@@ -152,6 +157,8 @@ export default function CIPPage() {
           value={filterType}
           onChange={setFilterType}
         />
+
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
 
         <div className="ml-auto flex items-center gap-3">
           {lastSynced && <span className="text-xs text-gray-500">Last synced: {lastSynced}</span>}
