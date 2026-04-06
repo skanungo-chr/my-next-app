@@ -12,7 +12,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { getUserRole, hasAnyAdmin, Role } from "@/lib/roles";
+import { ensureUserRole, getUserRole, hasAnyAdmin, Role } from "@/lib/roles";
 
 interface AuthContextType {
   user: User | null;
@@ -46,7 +46,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(firebaseUser);
       if (firebaseUser) {
         document.cookie = "app-auth=1; path=/; max-age=86400; SameSite=Lax";
-        const r = await getUserRole(firebaseUser.uid);
+        const r = await ensureUserRole(firebaseUser.uid, {
+          email:       firebaseUser.email        ?? "",
+          displayName: firebaseUser.displayName  ?? "",
+          photoURL:    firebaseUser.photoURL     ?? "",
+        });
         setRole(r);
       } else {
         document.cookie = "app-auth=; path=/; max-age=0";
