@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server";
 import { getGraphToken, graphFetch } from "@/lib/msgraph";
 
+interface SharePointSite {
+  id: string;
+  displayName: string;
+  webUrl: string;
+}
+
+interface SharePointList {
+  id: string;
+  displayName: string;
+}
+
 export async function GET() {
   const steps: Record<string, unknown> = {};
 
@@ -8,21 +19,21 @@ export async function GET() {
     const token = await getGraphToken();
     steps.token = "OK";
 
-    // Try alternate site lookup using hostname + path
-    let site;
+    let site: SharePointSite | undefined;
+
     try {
-      site = await graphFetch(
+      const data = await graphFetch(
         `/sites/chrsolutionsinc649.sharepoint.com:/sites/CIPCenter:`,
         token
-      );
+      ) as SharePointSite;
+      site = data;
       steps.site = { id: site.id, name: site.displayName };
     } catch (e1) {
       steps.site_attempt1 = e1 instanceof Error ? e1.message : String(e1);
 
-      // Fallback: search for site by name
       try {
-        const search = await graphFetch(`/sites?search=CIPCenter`, token);
-        steps.site_search = search.value?.map((s: { id: string; displayName: string; webUrl: string }) => ({
+        const search = await graphFetch(`/sites?search=CIPCenter`, token) as { value: SharePointSite[] };
+        steps.site_search = search.value?.map((s) => ({
           id: s.id,
           name: s.displayName,
           url: s.webUrl,
@@ -36,9 +47,8 @@ export async function GET() {
 
     if (!site?.id) throw new Error("Site not found");
 
-    // List all lists
-    const lists = await graphFetch(`/sites/${site.id}/lists`, token);
-    steps.lists = lists.value.map((l: { displayName: string; id: string }) => ({
+    const lists = await graphFetch(`/sites/${site.id}/lists`, token) as { value: SharePointList[] };
+    steps.lists = lists.value.map((l) => ({
       name: l.displayName,
       id: l.id,
     }));
