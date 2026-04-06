@@ -160,6 +160,29 @@ export default function CIPPage() {
 
         <DateRangeFilter value={dateRange} onChange={setDateRange} />
 
+        {/* Live result count */}
+        {cipRecords.length > 0 && (
+          <span className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors ${
+            filteredCIP.length === cipRecords.length
+              ? "bg-gray-800 border-gray-700 text-gray-400"
+              : "bg-indigo-600/15 border-indigo-500/30 text-indigo-300"
+          }`}>
+            {filteredCIP.length === cipRecords.length
+              ? `${cipRecords.length} record${cipRecords.length !== 1 ? "s" : ""}`
+              : `${filteredCIP.length} of ${cipRecords.length}`}
+          </span>
+        )}
+
+        {/* Clear all filters */}
+        {(filterStatus || filterType || dateRange.from || dateRange.to) && (
+          <button
+            onClick={() => { setFilterStatus(""); setFilterType(""); setDateRange({ from: "", to: "" }); }}
+            className="text-xs text-gray-500 hover:text-red-400 transition-colors underline underline-offset-2"
+          >
+            Clear filters
+          </button>
+        )}
+
         <div className="ml-auto flex items-center gap-3">
           {lastSynced && <span className="text-xs text-gray-500">Last synced: {lastSynced}</span>}
           {isAdmin && (
