@@ -15,21 +15,31 @@ function statusClass(status: string) {
   return STATUS_COLORS[status.toLowerCase()] ?? "bg-gray-700 text-gray-400";
 }
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50];
+
 export default function CIPPage() {
   const { msAccessToken, role } = useAuth();
   const isAdmin = role === "admin";
 
-  const [cipRecords, setCipRecords]   = useState<CIPRecord[]>([]);
-  const [cipLoading, setCipLoading]   = useState(false);
-  const [cipError, setCipError]       = useState("");
-  const [syncing, setSyncing]         = useState(false);
-  const [seeding, setSeeding]         = useState(false);
-  const [lastSynced, setLastSynced]   = useState<string | null>(null);
+  const [cipRecords, setCipRecords]     = useState<CIPRecord[]>([]);
+  const [cipLoading, setCipLoading]     = useState(false);
+  const [cipError, setCipError]         = useState("");
+  const [syncing, setSyncing]           = useState(false);
+  const [seeding, setSeeding]           = useState(false);
+  const [lastSynced, setLastSynced]     = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterType, setFilterType]     = useState("");
+  const [search, setSearch]             = useState("");
   const [debugResult, setDebugResult]   = useState<string | null>(null);
 
+  // Pagination
+  const [page, setPage]           = useState(1);
+  const [pageSize, setPageSize]   = useState(10);
+
   useEffect(() => { fetchCIPRecords(); }, []);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => { setPage(1); }, [filterStatus, filterType, search]);
 
   const authHeaders = (): Record<string, string> =>
     msAccessToken ? { Authorization: `Bearer ${msAccessToken}` } : {};
@@ -95,15 +105,45 @@ export default function CIPPage() {
   const uniqueTypes    = [...new Set(cipRecords.map((r) => r.cipType).filter(Boolean))];
 
   const filteredCIP = cipRecords.filter((r) => {
-    const matchStatus = filterStatus ? r.cipStatus.toLowerCase().includes(filterStatus.toLowerCase()) : true;
-    const matchType   = filterType   ? r.cipType.toLowerCase().includes(filterType.toLowerCase())     : true;
-    return matchStatus && matchType;
+    const q = search.toLowerCase();
+    const matchSearch = q
+      ? r.chrTicketNumbers.toLowerCase().includes(q) ||
+        r.cipType.toLowerCase().includes(q) ||
+        r.cipStatus.toLowerCase().includes(q)
+      : true;
+    const matchStatus = filterStatus ? r.cipStatus.toLowerCase() === filterStatus.toLowerCase() : true;
+    const matchType   = filterType   ? r.cipType.toLowerCase()   === filterType.toLowerCase()   : true;
+    return matchSearch && matchStatus && matchType;
   });
+
+  const totalPages  = Math.max(1, Math.ceil(filteredCIP.length / pageSize));
+  const safePage    = Math.min(page, totalPages);
+  const pageStart   = (safePage - 1) * pageSize;
+  const pageRecords = filteredCIP.slice(pageStart, pageStart + pageSize);
+
+  // Page numbers to show (max 5 around current)
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1).filter(
+    (n) => n === 1 || n === totalPages || Math.abs(n - safePage) <= 1
+  );
 
   return (
     <div>
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
+        {/* Search */}
+        <div className="relative">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-gray-800 border border-gray-700 text-sm text-white rounded-lg pl-9 pr-4 py-2 w-48 focus:outline-none focus:border-indigo-500 placeholder-gray-600"
+          />
+        </div>
+
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
@@ -112,6 +152,7 @@ export default function CIPPage() {
           <option value="">All Statuses</option>
           {uniqueStatuses.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
+
         <select
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
@@ -168,43 +209,108 @@ export default function CIPPage() {
         <p className="text-center text-gray-500 py-16">Loading CIP records...</p>
       ) : filteredCIP.length === 0 ? (
         <p className="text-center text-gray-600 py-16">
-          No CIP records found. Click &quot;Seed Data&quot; or &quot;Sync from SharePoint&quot; to load data.
+          {cipRecords.length === 0
+            ? <>No CIP records found. Click &quot;Seed Data&quot; or &quot;Sync from SharePoint&quot; to load data.</>
+            : "No records match your filters."}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-800">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-900 text-gray-400 text-left">
-                <th className="px-4 py-3 font-medium">CHR Ticket #</th>
-                <th className="px-4 py-3 font-medium">CIP Type</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Submission Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800">
-              {filteredCIP.map((record) => (
-                <tr key={record.id} className="hover:bg-gray-900/60 transition-colors">
-                  <td className="px-4 py-3 font-medium text-white">{record.chrTicketNumbers || "—"}</td>
-                  <td className="px-4 py-3 text-gray-300">{record.cipType || "—"}</td>
-                  <td className="px-4 py-3">
-                    {record.cipStatus ? (
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusClass(record.cipStatus)}`}>
-                        {record.cipStatus}
-                      </span>
-                    ) : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-gray-400">
-                    {record.submissionDate ? new Date(record.submissionDate).toLocaleDateString() : "—"}
-                  </td>
+        <>
+          <div className="overflow-x-auto rounded-xl border border-gray-800">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-900 text-gray-400 text-left">
+                  <th className="px-4 py-3 font-medium">#</th>
+                  <th className="px-4 py-3 font-medium">CHR Ticket #</th>
+                  <th className="px-4 py-3 font-medium">CIP Type</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Submission Date</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="px-4 py-2 bg-gray-900 border-t border-gray-800 text-xs text-gray-500">
-            {filteredCIP.length} record{filteredCIP.length !== 1 ? "s" : ""}
-            {msAccessToken ? " · Delegated access" : ""}
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {pageRecords.map((record, idx) => (
+                  <tr key={record.id} className="hover:bg-gray-900/60 transition-colors">
+                    <td className="px-4 py-3 text-gray-600 tabular-nums">{pageStart + idx + 1}</td>
+                    <td className="px-4 py-3 font-medium text-white">{record.chrTicketNumbers || "—"}</td>
+                    <td className="px-4 py-3 text-gray-300">{record.cipType || "—"}</td>
+                    <td className="px-4 py-3">
+                      {record.cipStatus ? (
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusClass(record.cipStatus)}`}>
+                          {record.cipStatus}
+                        </span>
+                      ) : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-gray-400">
+                      {record.submissionDate ? new Date(record.submissionDate).toLocaleDateString() : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Footer: count + page-size picker */}
+            <div className="flex items-center justify-between px-4 py-2.5 bg-gray-900 border-t border-gray-800">
+              <span className="text-xs text-gray-500">
+                {filteredCIP.length} record{filteredCIP.length !== 1 ? "s" : ""}
+                {filteredCIP.length !== cipRecords.length && ` (filtered from ${cipRecords.length})`}
+                {msAccessToken ? " · Delegated access" : ""}
+              </span>
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <span>Rows per page:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                  className="bg-gray-800 border border-gray-700 text-white rounded px-2 py-1 focus:outline-none"
+                >
+                  {PAGE_SIZE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+            </div>
           </div>
-        </div>
+
+          {/* Pagination controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-1 mt-4">
+              {/* Prev */}
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+                className="px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                ‹ Prev
+              </button>
+
+              {pageNumbers.map((n, i) => {
+                const prev = pageNumbers[i - 1];
+                return (
+                  <span key={n} className="flex items-center gap-1">
+                    {prev && n - prev > 1 && (
+                      <span className="px-1 text-gray-600 text-sm select-none">…</span>
+                    )}
+                    <button
+                      onClick={() => setPage(n)}
+                      className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
+                        n === safePage
+                          ? "bg-indigo-600 text-white"
+                          : "text-gray-400 hover:text-white hover:bg-gray-800"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  </span>
+                );
+              })}
+
+              {/* Next */}
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage === totalPages}
+                className="px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                Next ›
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
