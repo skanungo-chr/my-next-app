@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { CIPRecord } from "@/lib/cip";
+import StatusFilter from "@/components/StatusFilter";
 
 const STATUS_COLORS: Record<string, string> = {
   open:          "bg-blue-900/40 text-blue-300",
@@ -123,14 +124,11 @@ export default function CIPPage() {
     <div>
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <select
+        <StatusFilter
+          statuses={uniqueStatuses}
           value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="bg-gray-800 border border-gray-700 text-sm text-white rounded-lg px-3 py-2 focus:outline-none"
-        >
-          <option value="">All Statuses</option>
-          {uniqueStatuses.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
+          onChange={setFilterStatus}
+        />
 
         <select
           value={filterType}
