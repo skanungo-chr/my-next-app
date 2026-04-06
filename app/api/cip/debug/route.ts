@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getGraphToken, graphFetch } from "@/lib/msgraph";
+import { graphFetch } from "@/lib/msgraph";
 
 interface SharePointSite {
   id: string;
@@ -12,13 +12,20 @@ interface SharePointList {
   displayName: string;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const authHeader = request.headers.get("Authorization");
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+  if (!token) {
+    return NextResponse.json(
+      { success: false, error: "Sign in with Microsoft 365 first. This endpoint requires a delegated user token." },
+      { status: 401 }
+    );
+  }
+
   const steps: Record<string, unknown> = {};
 
   try {
-    const token = await getGraphToken();
-    steps.token = "OK";
-
     let site: SharePointSite | undefined;
 
     // Attempt 1: standard colon-path format
@@ -61,21 +68,11 @@ export async function GET() {
       }
     }
 
-    // Attempt 4: list root sites of the tenant
-    if (!site?.id) {
-      try {
-        const root = await graphFetch(`/sites/root`, token) as SharePointSite;
-        steps.root_site = { id: root.id, name: root.displayName, url: root.webUrl };
-      } catch (e4) {
-        steps.root_site = e4 instanceof Error ? e4.message : String(e4);
-      }
-    }
-
     if (!site?.id) {
       return NextResponse.json({
         success: false,
         steps,
-        error: "Could not access SharePoint site. Check: 1) Sites.Read.All permission is added as Application type, 2) Admin consent is granted (green tick in Azure API permissions).",
+        error: "Could not access SharePoint site. Make sure Sites.Read.All delegated permission is consented.",
       }, { status: 403 });
     }
 

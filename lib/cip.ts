@@ -1,4 +1,4 @@
-import { getGraphToken, graphFetch } from "@/lib/msgraph";
+import { graphFetch } from "@/lib/msgraph";
 
 const SHAREPOINT_HOST = "chrsolutionsinc649.sharepoint.com";
 const SITE_PATH = "/sites/CIPCenter";
@@ -32,10 +32,9 @@ async function getListId(siteId: string, listName: string, token: string): Promi
 
 export async function fetchCIPRecords(
   listName = "CIP",
-  userToken?: string | null
+  userToken: string
 ): Promise<CIPRecord[]> {
-  // Use delegated user token if available, otherwise fall back to app-only token
-  const token = userToken ?? (await getGraphToken());
+  const token = userToken;
 
   const siteId = await getSiteId(token);
   const listId = await getListId(siteId, listName, token);

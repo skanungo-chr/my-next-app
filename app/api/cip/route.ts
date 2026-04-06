@@ -11,10 +11,16 @@ export async function GET(request: Request) {
     ? authHeader.slice(7)
     : null;
 
+  if (!userToken) {
+    return NextResponse.json(
+      { success: false, error: "Sign in with Microsoft 365 to access CIP records." },
+      { status: 401 }
+    );
+  }
+
   try {
     const records = await fetchCIPRecords(listName, userToken);
-    const accessMode = userToken ? "delegated" : "app-only";
-    return NextResponse.json({ success: true, accessMode, count: records.length, records });
+    return NextResponse.json({ success: true, accessMode: "delegated", count: records.length, records });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ success: false, error: message }, { status: 500 });

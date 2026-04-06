@@ -17,7 +17,7 @@ export interface SyncResult {
 
 export async function syncCIPRecordsToFirestore(
   listName = "CIP",
-  userToken?: string | null
+  userToken: string
 ): Promise<SyncResult> {
   const errors: string[] = [];
 

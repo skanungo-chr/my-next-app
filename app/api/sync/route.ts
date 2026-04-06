@@ -5,9 +5,15 @@ export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
   const listName = searchParams.get("list") ?? "CIP";
 
-  // Accept delegated user token if provided
   const authHeader = request.headers.get("Authorization");
   const userToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+  if (!userToken) {
+    return NextResponse.json(
+      { success: false, error: "Sign in with Microsoft 365 to sync CIP records." },
+      { status: 401 }
+    );
+  }
 
   try {
     const result = await syncCIPRecordsToFirestore(listName, userToken);

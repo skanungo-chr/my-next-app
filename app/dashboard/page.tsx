@@ -41,6 +41,8 @@ export default function Dashboard() {
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterType, setFilterType] = useState("");
+  const [debugResult, setDebugResult] = useState<string | null>(null);
+  const [seeding, setSeeding] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) router.push("/auth");
@@ -130,6 +132,34 @@ export default function Dashboard() {
     }
   };
 
+  const handleSeed = async () => {
+    setSeeding(true);
+    setCipError("");
+    try {
+      const res = await fetch("/api/seed", { method: "POST" });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      await fetchCIPRecords();
+    } catch (err) {
+      setCipError(err instanceof Error ? err.message : "Seed failed");
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  const handleDebug = async () => {
+    setDebugResult("Running...");
+    try {
+      const headers: Record<string, string> = {};
+      if (msAccessToken) headers["Authorization"] = `Bearer ${msAccessToken}`;
+      const res = await fetch("/api/cip/debug", { headers });
+      const data = await res.json();
+      setDebugResult(JSON.stringify(data, null, 2));
+    } catch (err) {
+      setDebugResult(err instanceof Error ? err.message : "Debug failed");
+    }
+  };
+
   const filteredCIP = cipRecords.filter((r) => {
     const matchStatus = filterStatus ? r.cipStatus.toLowerCase().includes(filterStatus.toLowerCase()) : true;
     const matchType   = filterType   ? r.cipType.toLowerCase().includes(filterType.toLowerCase())     : true;
@@ -216,8 +246,31 @@ export default function Dashboard() {
                 >
                   {cipLoading ? "Loading..." : "Refresh"}
                 </button>
+                <button
+                  onClick={handleSeed}
+                  disabled={seeding}
+                  className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-xs px-3 py-2 rounded-lg transition-colors text-gray-400"
+                >
+                  {seeding ? "Seeding..." : "Seed Data"}
+                </button>
+                <button
+                  onClick={handleDebug}
+                  className="bg-gray-700 hover:bg-gray-600 text-xs px-3 py-2 rounded-lg transition-colors text-gray-400"
+                >
+                  Debug
+                </button>
               </div>
             </div>
+
+            {debugResult && (
+              <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 mb-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-semibold text-gray-400">Debug Output</span>
+                  <button onClick={() => setDebugResult(null)} className="text-xs text-gray-500 hover:text-gray-300">Close</button>
+                </div>
+                <pre className="text-xs text-green-400 overflow-auto max-h-64 whitespace-pre-wrap">{debugResult}</pre>
+              </div>
+            )}
 
             {cipError && (
               <div className="bg-red-900/30 border border-red-700 text-red-400 text-sm rounded-lg px-4 py-3 mb-4">

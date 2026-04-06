@@ -28,12 +28,12 @@ export async function getGraphToken(): Promise<string> {
   return data.access_token;
 }
 
-// Unified Graph fetch — uses delegated user token if provided, else app-only token
+// Graph fetch — requires a delegated user token
 export async function graphFetch(
   endpoint: string,
-  tokenOrNull?: string | null
+  token: string
 ): Promise<unknown> {
-  const token = tokenOrNull ?? (await getGraphToken());
+  if (!token) throw new Error("A delegated user token is required. Please sign in with Microsoft 365.");
 
   const res = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
     headers: {
