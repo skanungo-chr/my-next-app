@@ -12,9 +12,11 @@ import {
   signOut,
 } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { getUserRole, hasAnyAdmin, Role } from "@/lib/roles";
 
 interface AuthContextType {
   user: User | null;
+  role: Role | null;
   loading: boolean;
   msAccessToken: string | null;
   login: (email: string, password: string) => Promise<void>;
@@ -33,34 +35,25 @@ microsoftProvider.setCustomParameters({
 microsoftProvider.addScope("Sites.Read.All");
 microsoftProvider.addScope("Files.Read.All");
 
-async function upsertUserDoc(user: User) {
-  await setDoc(
-    doc(db, "users", user.uid),
-    {
-      email: user.email,
-      displayName: user.displayName ?? "",
-      photoURL: user.photoURL ?? "",
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser]               = useState<User | null>(null);
+  const [role, setRole]               = useState<Role | null>(null);
+  const [loading, setLoading]         = useState(true);
   const [msAccessToken, setMsAccessToken] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-      if (user) {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+      if (firebaseUser) {
         document.cookie = "app-auth=1; path=/; max-age=86400; SameSite=Lax";
+        const r = await getUserRole(firebaseUser.uid);
+        setRole(r);
       } else {
         document.cookie = "app-auth=; path=/; max-age=0";
+        setRole(null);
         setMsAccessToken(null);
       }
+      setLoading(false);
     });
     return unsubscribe;
   }, []);
@@ -71,32 +64,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = async (email: string, password: string) => {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
-    await setDoc(doc(db, "users", credential.user.uid), {
+    const uid = credential.user.uid;
+    // First user ever becomes admin; all subsequent users are viewers
+    const firstAdmin = !(await hasAnyAdmin());
+    const assignedRole: Role = firstAdmin ? "admin" : "viewer";
+    await setDoc(doc(db, "users", uid), {
       email: credential.user.email,
       displayName: credential.user.displayName ?? "",
       photoURL: "",
+      role: assignedRole,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+    setRole(assignedRole);
   };
 
   const loginWithMicrosoft = async () => {
     const result = await signInWithPopup(auth, microsoftProvider);
-    // Extract delegated access token from Microsoft OAuth result
     const credential = OAuthProvider.credentialFromResult(result);
-    if (credential?.accessToken) {
-      setMsAccessToken(credential.accessToken);
-    }
-    await upsertUserDoc(result.user);
+    if (credential?.accessToken) setMsAccessToken(credential.accessToken);
+
+    const uid = result.user.uid;
+    // Upsert user doc — preserve existing role if already set
+    const existingRole = await getUserRole(uid);
+    const isNew = existingRole === "viewer";
+    const firstAdmin = isNew && !(await hasAnyAdmin());
+    const assignedRole: Role = firstAdmin ? "admin" : existingRole;
+
+    await setDoc(
+      doc(db, "users", uid),
+      {
+        email: result.user.email,
+        displayName: result.user.displayName ?? "",
+        photoURL: result.user.photoURL ?? "",
+        role: assignedRole,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+    setRole(assignedRole);
   };
 
   const logout = async () => {
     await signOut(auth);
     setMsAccessToken(null);
+    setRole(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, msAccessToken, login, signup, loginWithMicrosoft, logout }}>
+    <AuthContext.Provider value={{ user, role, loading, msAccessToken, login, signup, loginWithMicrosoft, logout }}>
       {children}
     </AuthContext.Provider>
   );

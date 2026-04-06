@@ -16,7 +16,8 @@ function statusClass(status: string) {
 }
 
 export default function CIPPage() {
-  const { msAccessToken } = useAuth();
+  const { msAccessToken, role } = useAuth();
+  const isAdmin = role === "admin";
 
   const [cipRecords, setCipRecords]   = useState<CIPRecord[]>([]);
   const [cipLoading, setCipLoading]   = useState(false);
@@ -122,22 +123,28 @@ export default function CIPPage() {
 
         <div className="ml-auto flex items-center gap-3">
           {lastSynced && <span className="text-xs text-gray-500">Last synced: {lastSynced}</span>}
-          <button onClick={handleSync} disabled={syncing}
-            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-            {syncing ? "Syncing..." : "Sync from SharePoint"}
-          </button>
+          {isAdmin && (
+            <button onClick={handleSync} disabled={syncing}
+              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+              {syncing ? "Syncing..." : "Sync from SharePoint"}
+            </button>
+          )}
           <button onClick={fetchCIPRecords} disabled={cipLoading}
             className="bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-sm px-4 py-2 rounded-lg transition-colors">
             {cipLoading ? "Loading..." : "Refresh"}
           </button>
-          <button onClick={handleSeed} disabled={seeding}
-            className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-xs px-3 py-2 rounded-lg transition-colors text-gray-400">
-            {seeding ? "Seeding..." : "Seed Data"}
-          </button>
-          <button onClick={handleDebug}
-            className="bg-gray-700 hover:bg-gray-600 text-xs px-3 py-2 rounded-lg transition-colors text-gray-400">
-            Debug
-          </button>
+          {isAdmin && (
+            <button onClick={handleSeed} disabled={seeding}
+              className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-xs px-3 py-2 rounded-lg transition-colors text-gray-400">
+              {seeding ? "Seeding..." : "Seed Data"}
+            </button>
+          )}
+          {isAdmin && (
+            <button onClick={handleDebug}
+              className="bg-gray-700 hover:bg-gray-600 text-xs px-3 py-2 rounded-lg transition-colors text-gray-400">
+              Debug
+            </button>
+          )}
         </div>
       </div>
 

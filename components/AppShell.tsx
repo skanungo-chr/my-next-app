@@ -8,6 +8,7 @@ import Link from "next/link";
 interface NavItem {
   label: string;
   href: string;
+  adminOnly?: boolean;
   icon: React.ReactNode;
 }
 
@@ -32,11 +33,22 @@ const NAV_ITEMS: NavItem[] = [
       </svg>
     ),
   },
+  {
+    label: "User Management",
+    href: "/dashboard/admin",
+    adminOnly: true,
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round"
+          d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+      </svg>
+    ),
+  },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { user, logout, msAccessToken } = useAuth();
-  const router = useRouter();
+  const { user, role, logout, msAccessToken } = useAuth();
+  const router  = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -49,12 +61,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     ? user.displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : user?.email?.[0]?.toUpperCase() ?? "?";
 
+  const visibleNav = NAV_ITEMS.filter((item) => !item.adminOnly || role === "admin");
+
   const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
-    <aside
-      className={`flex flex-col bg-gray-900 border-r border-gray-800 h-full ${
-        mobile ? "w-64" : "w-64 hidden lg:flex"
-      }`}
-    >
+    <aside className={`flex flex-col bg-gray-900 border-r border-gray-800 h-full ${mobile ? "w-64" : "w-64 hidden lg:flex"}`}>
+
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-gray-800">
         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-600 shrink-0">
@@ -69,7 +80,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider px-3 mb-2">Menu</p>
-        {NAV_ITEMS.map((item) => {
+        {visibleNav.map((item) => {
           const active = pathname.startsWith(item.href);
           return (
             <Link
@@ -90,9 +101,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* User section */}
-      <div className="px-3 py-4 border-t border-gray-800">
+      <div className="px-3 py-4 border-t border-gray-800 space-y-2">
         {msAccessToken && (
-          <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg bg-green-900/20 border border-green-800/40">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-900/20 border border-green-800/40">
             <div className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
             <span className="text-xs text-green-400 truncate">Microsoft connected</span>
           </div>
@@ -102,15 +113,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-white truncate">
-              {user?.displayName ?? "User"}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-medium text-white truncate">
+                {user?.displayName ?? "User"}
+              </p>
+              {role && (
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0 ${
+                  role === "admin"
+                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                    : "bg-gray-700 text-gray-400"
+                }`}>
+                  {role}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-gray-500 truncate">{user?.email}</p>
           </div>
         </div>
         <button
           onClick={handleLogout}
-          className="mt-2 w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:text-red-400 hover:bg-red-900/10 transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:text-red-400 hover:bg-red-900/10 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round"
@@ -126,38 +148,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-gray-950 text-white overflow-hidden">
-      {/* Desktop sidebar */}
       <Sidebar />
 
-      {/* Mobile sidebar overlay */}
+      {/* Mobile overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setSidebarOpen(false)}
-          />
-          <div className="absolute left-0 top-0 bottom-0 z-50">
-            <Sidebar mobile />
-          </div>
+          <div className="absolute inset-0 bg-black/60" onClick={() => setSidebarOpen(false)} />
+          <div className="absolute left-0 top-0 bottom-0 z-50"><Sidebar mobile /></div>
         </div>
       )}
 
-      {/* Main area */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         {/* Topbar */}
         <header className="flex items-center gap-4 px-6 py-4 border-b border-gray-800 bg-gray-950 shrink-0">
-          {/* Mobile hamburger */}
-          <button
-            className="lg:hidden text-gray-400 hover:text-white"
-            onClick={() => setSidebarOpen(true)}
-          >
+          <button className="lg:hidden text-gray-400 hover:text-white" onClick={() => setSidebarOpen(true)}>
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
           </button>
-
           <h1 className="text-lg font-semibold text-white">{pageTitle}</h1>
-
           <div className="ml-auto flex items-center gap-3">
             <div className="hidden sm:block text-right">
               <p className="text-xs text-gray-500">{user?.email}</p>
@@ -168,10 +177,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
-        </main>
+        <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
     </div>
   );
