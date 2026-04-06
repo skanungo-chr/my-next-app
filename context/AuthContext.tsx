@@ -55,8 +55,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
-      // Clear MS token on sign-out
-      if (!user) setMsAccessToken(null);
+      if (user) {
+        document.cookie = "app-auth=1; path=/; max-age=86400; SameSite=Lax";
+      } else {
+        document.cookie = "app-auth=; path=/; max-age=0";
+        setMsAccessToken(null);
+      }
     });
     return unsubscribe;
   }, []);
