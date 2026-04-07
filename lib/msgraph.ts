@@ -1,6 +1,7 @@
 const TENANT_ID = process.env.AZURE_TENANT_ID!;
-const CLIENT_ID = process.env.AZURE_CLIENT_ID!;
-const CLIENT_SECRET = process.env.AZURE_CLIENT_SECRET!;
+// Graph API app ("my-next-app") — separate from the SSO app ("Dashboard CIP App")
+const CLIENT_ID = process.env.AZURE_GRAPH_CLIENT_ID!;
+const CLIENT_SECRET = process.env.AZURE_GRAPH_CLIENT_SECRET!;
 
 // App-only token (client credentials) — used when no user token is available
 export async function getGraphToken(): Promise<string> {
