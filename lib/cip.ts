@@ -3,6 +3,17 @@ import { graphFetch } from "@/lib/msgraph";
 const SHAREPOINT_HOST = "chrsolutionsinc649.sharepoint.com";
 const SITE_PATH = "/sites/CIPCenter";
 
+// Common name variations to try when the configured list name isn't found
+const LIST_NAME_CANDIDATES = [
+  "CIP",
+  "CIP Records",
+  "CIPRecords",
+  "Change Implementation Plan",
+  "Change Implementation Plans",
+  "CIP List",
+  "CIPs",
+];
+
 export interface CIPRecord {
   id: string;
   chrTicketNumbers: string;
@@ -19,19 +30,44 @@ async function getSiteId(token: string): Promise<string> {
   return data.id;
 }
 
-async function getListId(siteId: string, listName: string, token: string): Promise<string> {
+async function getAllLists(siteId: string, token: string): Promise<{ displayName: string; id: string }[]> {
   const data = await graphFetch(`/sites/${siteId}/lists`, token) as {
     value: { displayName: string; id: string }[];
   };
-  const list = data.value.find(
-    (l) => l.displayName.toLowerCase() === listName.toLowerCase()
-  );
-  if (!list) throw new Error(`List "${listName}" not found on SharePoint site`);
+  return data.value;
+}
+
+async function getListId(siteId: string, listName: string, token: string): Promise<string> {
+  const lists = await getAllLists(siteId, token);
+
+  // Try exact match first (case-insensitive)
+  let list = lists.find((l) => l.displayName.toLowerCase() === listName.toLowerCase());
+
+  // If not found, try all known candidates
+  if (!list) {
+    for (const candidate of LIST_NAME_CANDIDATES) {
+      list = lists.find((l) => l.displayName.toLowerCase() === candidate.toLowerCase());
+      if (list) break;
+    }
+  }
+
+  // If still not found, include available list names in the error
+  if (!list) {
+    const available = lists
+      .filter((l) => !l.displayName.startsWith("_") && !l.displayName.startsWith("appdata"))
+      .map((l) => `"${l.displayName}"`)
+      .join(", ");
+    throw new Error(
+      `CIP list not found on SharePoint site. Available lists: ${available || "none"}. ` +
+      `Set SHAREPOINT_LIST_NAME env var to the correct list name.`
+    );
+  }
+
   return list.id;
 }
 
 export async function fetchCIPRecords(
-  listName = "CIP",
+  listName = process.env.SHAREPOINT_LIST_NAME ?? "CIP",
   userToken: string
 ): Promise<CIPRecord[]> {
   const token = userToken;
@@ -40,7 +76,7 @@ export async function fetchCIPRecords(
   const listId = await getListId(siteId, listName, token);
 
   const data = await graphFetch(
-    `/sites/${siteId}/lists/${listId}/items?expand=fields(select=Title,CIPType,CIPStatus,SubmissionDate)&$top=100`,
+    `/sites/${siteId}/lists/${listId}/items?expand=fields(select=Title,CIPType,CIPStatus,SubmissionDate)&$top=500`,
     token
   ) as {
     value: {
