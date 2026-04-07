@@ -32,8 +32,9 @@ microsoftProvider.setCustomParameters({
   tenant: process.env.NEXT_PUBLIC_AZURE_TENANT_ID ?? "common",
   prompt: "select_account",
 });
-microsoftProvider.addScope("Sites.Read.All");
-microsoftProvider.addScope("Files.Read.All");
+// Only request basic profile scopes on the SSO app (Dashboard CIP App)
+// SharePoint scopes belong to the Graph API app and are not requested at login
+microsoftProvider.addScope("User.Read");
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser]               = useState<User | null>(null);
