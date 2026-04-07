@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 function friendlyError(message: string): string {
   if (message.includes("invalid-credential") || message.includes("wrong-password"))
@@ -26,17 +28,19 @@ export default function AuthPage() {
   const { login, signup, loginWithMicrosoft } = useAuth();
   const router = useRouter();
 
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [showPw, setShowPw]     = useState(false);
-  const [error, setError]       = useState("");
-  const [loading, setLoading]   = useState(false);
+  const [isLogin, setIsLogin]     = useState(true);
+  const [email, setEmail]         = useState("");
+  const [password, setPassword]   = useState("");
+  const [showPw, setShowPw]       = useState(false);
+  const [error, setError]         = useState("");
+  const [success, setSuccess]     = useState("");
+  const [loading, setLoading]     = useState(false);
   const [msLoading, setMsLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setError(""); setSuccess("");
     setLoading(true);
     try {
       if (isLogin) {
@@ -53,7 +57,7 @@ export default function AuthPage() {
   };
 
   const handleMicrosoftLogin = async () => {
-    setError("");
+    setError(""); setSuccess("");
     setMsLoading(true);
     try {
       await loginWithMicrosoft();
@@ -65,11 +69,26 @@ export default function AuthPage() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError("Enter your email address above, then click Forgot password.");
+      return;
+    }
+    setError(""); setSuccess("");
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setResetSent(true);
+      setSuccess(`Password reset email sent to ${email}. Check your inbox.`);
+    } catch (err: unknown) {
+      setError(friendlyError(err instanceof Error ? err.message : "Failed to send reset email"));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
 
-        {/* Logo / App name */}
+        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-600 mb-4">
             <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -94,11 +113,21 @@ export default function AuthPage() {
             </div>
           )}
 
+          {/* Success */}
+          {success && (
+            <div className="flex items-start gap-3 bg-green-900/30 border border-green-700/50 text-green-400 text-sm rounded-lg px-4 py-3 mb-5">
+              <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+              </svg>
+              {success}
+            </div>
+          )}
+
           {/* Microsoft */}
           <button
             onClick={handleMicrosoftLogin}
             disabled={msLoading || loading}
-            className="w-full flex items-center justify-center gap-3 bg-gray-800 hover:bg-gray-750 disabled:opacity-50 border border-gray-700 text-white font-medium rounded-lg py-2.5 mb-5 transition-colors"
+            className="w-full flex items-center justify-center gap-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 border border-gray-700 text-white font-medium rounded-lg py-2.5 mb-5 transition-colors"
           >
             <svg width="18" height="18" viewBox="0 0 21 21" fill="none">
               <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
@@ -119,9 +148,7 @@ export default function AuthPage() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                Email address
-              </label>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">Email address</label>
               <input
                 type="email"
                 value={email}
@@ -134,9 +161,19 @@ export default function AuthPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-gray-300">Password</label>
+                {isLogin && (
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    disabled={resetSent}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 disabled:text-gray-600 transition-colors"
+                  >
+                    {resetSent ? "Email sent" : "Forgot password?"}
+                  </button>
+                )}
+              </div>
               <div className="relative">
                 <input
                   type={showPw ? "text" : "password"}
@@ -179,7 +216,7 @@ export default function AuthPage() {
           <p className="text-center text-sm text-gray-500 mt-5">
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
             <button
-              onClick={() => { setIsLogin(!isLogin); setError(""); }}
+              onClick={() => { setIsLogin(!isLogin); setError(""); setSuccess(""); setResetSent(false); }}
               className="text-indigo-400 hover:text-indigo-300 font-medium"
             >
               {isLogin ? "Sign up" : "Sign in"}
