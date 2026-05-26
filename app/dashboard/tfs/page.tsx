@@ -925,7 +925,7 @@ export default function TFSRecordsPage() {
   const [justRefreshed, setJustRefreshed] = useState(false);
   const [usedFallback, setUsedFallback]   = useState(false);
   const [fallbackReason, setFallbackReason] = useState("");
-  const [dateRange, setDateRange]         = useState<DateRangeMonths>(3);
+  const [dateRange, setDateRange]         = useState<DateRangeMonths>(1);
   const [activeTab, setActiveTab]         = useState<"items" | "incidents">("items");
 
   // Filters (Work Items tab)
@@ -990,7 +990,7 @@ export default function TFSRecordsPage() {
         setCipLoading(false);
         const ids = extractCIPTFSIds(r);
         cipIdsRef.current = ids;
-        doFetch(3, ids);
+        doFetch(1, ids);
       })
       .catch(() => {
         setCipLoading(false);
