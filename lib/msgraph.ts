@@ -1,9 +1,9 @@
 const TENANT_ID = process.env.AZURE_TENANT_ID!;
-// Graph API app ("my-next-app") — separate from the SSO app ("Dashboard CIP App")
+// Graph API app ("my-next-app") credentials — used for server-side SharePoint access
 const CLIENT_ID = process.env.AZURE_GRAPH_CLIENT_ID!;
 const CLIENT_SECRET = process.env.AZURE_GRAPH_CLIENT_SECRET!;
 
-// App-only token (client credentials) — used when no user token is available
+// App-only token via client credentials (Graph API app)
 export async function getGraphToken(): Promise<string> {
   const url = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`;
 
@@ -29,18 +29,26 @@ export async function getGraphToken(): Promise<string> {
   return data.access_token;
 }
 
-// Graph fetch — requires a delegated user token
+// Graph fetch — uses delegated user token if provided, else falls back to app-only
 export async function graphFetch(
   endpoint: string,
-  token: string
+  tokenOrNull?: string | null,
+  options?: { method?: string; body?: string }
 ): Promise<unknown> {
-  if (!token) throw new Error("A delegated user token is required. Please sign in with Microsoft 365.");
+  const token = tokenOrNull ?? (await getGraphToken());
 
-  const res = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
+  const url = endpoint.startsWith("https://")
+    ? endpoint
+    : `https://graph.microsoft.com/v1.0${endpoint}`;
+
+  const res = await fetch(url, {
+    method: options?.method ?? "GET",
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
+      ...(options?.body ? { "Content-Type": "application/json" } : {}),
     },
+    ...(options?.body ? { body: options.body } : {}),
   });
 
   if (!res.ok) {
