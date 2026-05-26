@@ -994,7 +994,7 @@ export default function TFSRecordsPage() {
       })
       .catch(() => {
         setCipLoading(false);
-        doFetch(3, []);
+        doFetch(1, []);
       });
   }, [doFetch]);
 
