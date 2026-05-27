@@ -289,7 +289,8 @@ export default function CIPPage() {
   return (
     <div>
       {/* ── Toolbar / Filters ── */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
+      <div className="sticky top-0 z-10 bg-[#0f1117] py-3 border-b border-white/10 -mx-6 px-6 mb-4">
+      <div className="flex flex-wrap items-center gap-3">
         <FilterDropdown
           multi
           label="Status"
@@ -434,6 +435,7 @@ export default function CIPPage() {
             </button>
           )}
         </div>
+      </div>
       </div>
 
       {/* ── KPI Cards ── */}
