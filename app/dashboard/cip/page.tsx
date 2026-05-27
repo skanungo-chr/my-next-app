@@ -11,6 +11,7 @@ import CIPStatusChart from "@/components/CIPStatusChart";
 import { CIPsByCategory, CIPsByCompany, CIPsByProduct, CIPsByTFS, CIPsMonthlyTrend } from "@/components/charts";
 import CIPCreateModal from "@/components/CIPCreateModal";
 import CIPEditModal from "@/components/CIPEditModal";
+import CIPFilterBar from "@/components/CIPFilterBar";
 
 const STATUS_COLORS: Record<string, string> = {
   open:          "bg-blue-900/40 text-blue-300",
@@ -288,155 +289,40 @@ export default function CIPPage() {
 
   return (
     <div>
-      {/* ── Toolbar / Filters ── */}
-      <div className="sticky top-0 z-10 bg-[#0f1117] py-3 border-b border-white/10 -mx-6 px-6 mb-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <FilterDropdown
-          multi
-          label="Status"
-          options={statusOptions}
-          value={filterStatus}
-          onChange={setFilterStatus}
-        />
-
-        <FilterDropdown
-          multi
-          label="CIP Type"
-          options={typeOptions}
-          value={filterType}
-          onChange={setFilterType}
-        />
-
-        <div className="relative">
-          <select
-            value={filterClient}
-            onChange={(e) => { setFilterClient(e.target.value); setPage(1); }}
-            className={`appearance-none pl-3 pr-8 py-2 rounded-lg border text-sm transition-colors focus:outline-none cursor-pointer ${
-              filterClient
-                ? "bg-indigo-600/15 border-indigo-500/40 text-indigo-300"
-                : "bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600 hover:text-white"
-            }`}
-          >
-            <option value="">All Clients</option>
-            {uniqueClients.map((c) => (
-              <option key={c} value={c} className="bg-gray-900 text-white">
-                {c} ({clientCounts[c] ?? 0})
-              </option>
-            ))}
-          </select>
-          <svg className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-
-        <DateRangeFilter value={dateRange} onChange={setDateRange} />
-
-        <button
-          onClick={() => setFilterEmergency((v) => !v)}
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors ${
-            filterEmergency
-              ? "bg-red-600/20 border-red-500/50 text-red-400"
-              : "bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600 hover:text-white"
-          }`}
-        >
-          <span className={`w-2 h-2 rounded-full ${filterEmergency ? "bg-red-400" : "bg-gray-500"}`} />
-          Emergency
-        </button>
-
-        {cipRecords.length > 0 && (
-          <span className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors ${
-            filteredCIP.length === cipRecords.length
-              ? "bg-gray-800 border-gray-700 text-gray-400"
-              : "bg-indigo-600/15 border-indigo-500/30 text-indigo-300"
-          }`}>
-            {filteredCIP.length === cipRecords.length
-              ? `${cipRecords.length} record${cipRecords.length !== 1 ? "s" : ""}`
-              : `${filteredCIP.length} of ${cipRecords.length}`}
-          </span>
-        )}
-
-        {(filterStatus.length > 0 || filterType.length > 0 || filterClient || filterEmergency || dateRange.from || dateRange.to) && (
-          <button
-            onClick={() => { setFilterStatus([]); setFilterType([]); setFilterClient(""); setFilterEmergency(false); setDateRange({ from: "", to: "" }); }}
-            className="text-xs text-gray-500 hover:text-red-400 transition-colors underline underline-offset-2"
-          >
-            Clear filters
-          </button>
-        )}
-
-        <div className="ml-auto flex items-center gap-3">
-          {syncSummary && !syncing && (
-            <span className="text-xs text-green-400">
-              Sync complete: {syncSummary.synced.toLocaleString()} synced
-              {syncSummary.failed > 0 && <span className="text-red-400">, {syncSummary.failed} failed</span>}
-            </span>
-          )}
-          {lastSynced && !syncSummary && <span className="text-xs text-gray-500">Last synced: {lastSynced}</span>}
-          {isAdmin && (
-            <div className="flex flex-col items-end gap-1.5">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5">
-                  <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <select
-                    value={syncFromYear}
-                    onChange={(e) => setSyncFromYear(e.target.value)}
-                    disabled={syncing}
-                    className="bg-transparent text-xs text-gray-300 outline-none cursor-pointer disabled:opacity-50"
-                  >
-                    {Object.keys(FETCH_FROM_YEARS).map((y) => (
-                      <option key={y} value={y} className="bg-gray-900">{y === "All" ? "All Records" : `From ${y}`}</option>
-                    ))}
-                  </select>
-                </div>
-                <button onClick={handleSync} disabled={syncing}
-                  className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-sm font-medium px-4 py-2 rounded-lg transition-colors min-w-[160px] text-center">
-                  {syncing && syncProgress
-                    ? `Syncing... ${syncProgress.synced.toLocaleString()} / ${syncProgress.total.toLocaleString()} (${Math.round((syncProgress.synced / Math.max(syncProgress.total, 1)) * 100)}%)`
-                    : syncing ? "Syncing..."
-                    : "Sync from SharePoint"}
-                </button>
-              </div>
-              {syncing && syncProgress && (
-                <div className="w-full h-1 bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-indigo-500 transition-all duration-300"
-                    style={{ width: `${Math.round((syncProgress.synced / Math.max(syncProgress.total, 1)) * 100)}%` }}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-          <button onClick={handleExportCSV}
-            className="bg-emerald-700 hover:bg-emerald-600 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-            Export CSV
-          </button>
-          <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-xs text-gray-400">
-            <span className={`w-1.5 h-1.5 rounded-full ${cipLoading ? "bg-yellow-400 animate-pulse" : "bg-green-400"}`} />
-            {cipLoading ? "Loading..." : "Ready"}
-          </div>
-          {isAdmin && (
-            <button onClick={handleSeed} disabled={seeding}
-              className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-xs px-3 py-2 rounded-lg transition-colors text-gray-400">
-              {seeding ? "Seeding..." : "Seed Data"}
-            </button>
-          )}
-          {isAdmin && (
-            <button onClick={handleDebug}
-              className="bg-gray-700 hover:bg-gray-600 text-xs px-3 py-2 rounded-lg transition-colors text-gray-400">
-              Debug
-            </button>
-          )}
-          {isAdmin && (
-            <button onClick={handleCheckProducts}
-              className="bg-gray-700 hover:bg-gray-600 text-xs px-3 py-2 rounded-lg transition-colors text-amber-400">
-              Check SP Products
-            </button>
-          )}
-        </div>
-      </div>
-      </div>
+      {/* ── Filter Bar ── */}
+      <CIPFilterBar
+        filterStatus={filterStatus}
+        filterType={filterType}
+        filterClient={filterClient}
+        filterEmergency={filterEmergency}
+        dateRange={dateRange}
+        syncFromYear={syncFromYear}
+        statusOptions={statusOptions}
+        typeOptions={typeOptions}
+        uniqueClients={uniqueClients}
+        clientCounts={clientCounts}
+        cipRecordsCount={cipRecords.length}
+        filteredCount={filteredCIP.length}
+        cipLoading={cipLoading}
+        isAdmin={isAdmin}
+        syncing={syncing}
+        seeding={seeding}
+        syncProgress={syncProgress}
+        syncSummary={syncSummary}
+        lastSynced={lastSynced}
+        onFilterStatusChange={setFilterStatus}
+        onFilterTypeChange={setFilterType}
+        onFilterClientChange={(v) => { setFilterClient(v); setPage(1); }}
+        onFilterEmergencyToggle={() => { setFilterEmergency((x) => !x); setPage(1); }}
+        onDateRangeChange={setDateRange}
+        onSyncFromYearChange={setSyncFromYear}
+        onClearFilters={() => { setFilterStatus([]); setFilterType([]); setFilterClient(""); setFilterEmergency(false); setDateRange({ from: "", to: "" }); }}
+        onSync={handleSync}
+        onExportCSV={handleExportCSV}
+        onSeed={handleSeed}
+        onDebug={handleDebug}
+        onCheckProducts={handleCheckProducts}
+      />
 
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
