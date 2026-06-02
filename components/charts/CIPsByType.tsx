@@ -96,7 +96,10 @@ export default function CIPsByType(props: Props) {
               dataKey="count"
               position="top"
               style={{ fill: "#9ca3af", fontSize: 10 }}
-              formatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)}
+              formatter={(v) => {
+                const n = Number(v);
+                return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+              }}
             />
           </Bar>
         </BarChart>

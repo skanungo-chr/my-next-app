@@ -497,9 +497,10 @@ export default function CIPsByTypePage() {
                       dataKey="count"
                       position="top"
                       style={{ fill: "#9CA3AF", fontSize: 11, fontWeight: 600 }}
-                      formatter={(v: number) =>
-                        v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v)
-                      }
+                      formatter={(v) => {
+                        const n = Number(v);
+                        return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+                      }}
                     />
                     {chartData.map((_, i) => (
                       <Cell key={i} fill={ORANGE} fillOpacity={i === 0 ? 1 : 0.82} />
