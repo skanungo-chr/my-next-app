@@ -123,10 +123,6 @@ const MOCK_GROUPS: TFSGroup[] = [
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CIP_STATUSES = [
-  "Approved", "Denied", "Draft", "Submitted",
-  "Successful", "Cancelled", "Rolled Back", "Failed",
-];
 
 const STATUS_BADGE: Record<string, string> = {
   approved:      "bg-emerald-900/40 text-emerald-400 border-emerald-700/50",
@@ -189,7 +185,6 @@ export default function CIPsByTypePage() {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   // Filters
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedType, setSelectedType]         = useState("All");
   const [selectedClient, setSelectedClient]     = useState("All");
   const [fromDate, setFromDate]                 = useState(DEFAULT_FROM);
@@ -262,16 +257,14 @@ export default function CIPsByTypePage() {
   const filtered = useMemo(() => {
     if (usingMock) return [];
     return cipRecords.filter(r => {
-      const matchStatus = selectedStatuses.length === 0 ||
-        selectedStatuses.some(s => r.cipStatus?.toLowerCase() === s.toLowerCase());
       const matchType   = selectedType   === "All" || r.cipType    === selectedType;
       const matchClient = selectedClient === "All" || r.clientName === selectedClient;
       const recMonth    = r.submissionDate ? r.submissionDate.slice(0, 7) : "";
       const matchFrom   = fromDate ? recMonth >= fromDate : true;
       const matchTo     = toDate   ? recMonth <= toDate   : true;
-      return matchStatus && matchType && matchClient && matchFrom && matchTo;
+      return matchType && matchClient && matchFrom && matchTo;
     });
-  }, [cipRecords, usingMock, selectedStatuses, selectedType, selectedClient, fromDate, toDate]);
+  }, [cipRecords, usingMock, selectedType, selectedClient, fromDate, toDate]);
 
   // ── Group CIP records by TFS work item (via Custom.IncidentID ↔ chrTicketNumbers) ──
 
@@ -344,7 +337,6 @@ export default function CIPsByTypePage() {
   // ── Filter helpers ──────────────────────────────────────────────────────────
 
   const hasActiveFilters =
-    selectedStatuses.length > 0 ||
     selectedType   !== "All" ||
     selectedClient !== "All" ||
     fromDate !== DEFAULT_FROM ||
@@ -352,18 +344,12 @@ export default function CIPsByTypePage() {
     !!tfsSearch;
 
   const resetFilters = () => {
-    setSelectedStatuses([]);
     setSelectedType("All");
     setSelectedClient("All");
     setFromDate(DEFAULT_FROM);
     setToDate("");
     setTfsSearch("");
   };
-
-  const toggleStatus = (s: string) =>
-    setSelectedStatuses(prev =>
-      prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
-    );
 
   const toggleRow = (tfsNumber: string) =>
     setExpandedRows(prev => {
@@ -493,71 +479,8 @@ export default function CIPsByTypePage() {
         )}
       </div>
 
-      {/* Main layout: sidebar + content */}
-      <div className="flex flex-col lg:flex-row gap-6">
-
-        {/* Left sidebar — CIP Status checkboxes */}
-        <div className="w-full lg:w-56 shrink-0">
-          <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-4 sticky top-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-white">CIP Status</span>
-              {selectedStatuses.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] bg-amber-600/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-semibold">
-                    {selectedStatuses.length}
-                  </span>
-                  <button
-                    onClick={() => setSelectedStatuses([])}
-                    className="text-gray-500 hover:text-red-400 transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {loading ? (
-              <div className="space-y-2.5">
-                {CIP_STATUSES.map((_, i) => (
-                  <div key={i} className="h-4 bg-gray-700 rounded animate-pulse"
-                    style={{ width: `${60 + (i % 3) * 15}%` }} />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {CIP_STATUSES.map(status => {
-                  const checked = selectedStatuses.includes(status);
-                  return (
-                    <label key={status} className="flex items-center gap-2.5 cursor-pointer group"
-                      onClick={() => toggleStatus(status)}>
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                        checked ? "bg-amber-600 border-amber-500" : "bg-gray-800 border-gray-600 group-hover:border-gray-400"
-                      }`}>
-                        {checked && (
-                          <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                      <span className={`text-sm select-none transition-colors ${
-                        checked ? "text-white font-medium" : "text-gray-400 group-hover:text-gray-200"
-                      }`}>{status}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-            {selectedStatuses.length === 0 && !loading && (
-              <p className="text-xs text-gray-600 mt-3 border-t border-gray-800 pt-2">All statuses shown</p>
-            )}
-          </div>
-        </div>
-
-        {/* Right: dropdowns + chart + table */}
-        <div className="flex-1 min-w-0 space-y-5">
+      {/* Filters + chart + table */}
+      <div className="space-y-5">
 
           {/* TFS number search */}
           <div className="relative">
@@ -921,7 +844,6 @@ export default function CIPsByTypePage() {
               </table>
             </div>
           )}
-        </div>
       </div>
     </div>
   );
