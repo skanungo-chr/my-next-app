@@ -194,6 +194,7 @@ export default function CIPsByTypePage() {
   const [selectedClient, setSelectedClient]     = useState("All");
   const [fromDate, setFromDate]                 = useState(DEFAULT_FROM);
   const [toDate, setToDate]                     = useState("");
+  const [tfsSearch, setTfsSearch]               = useState("");
 
   // ── Data loading ────────────────────────────────────────────────────────────
 
@@ -320,17 +321,24 @@ export default function CIPsByTypePage() {
     });
   }, [tfsItems, filtered, usingMock, cipRecords.length]);
 
+  // Apply TFS number search on top of the already-filtered groups
+  const visibleGroups = useMemo(() => {
+    if (!tfsSearch.trim()) return tfsGroups;
+    const q = tfsSearch.trim().toLowerCase();
+    return tfsGroups.filter(g => g.tfsNumber.toLowerCase().includes(q));
+  }, [tfsGroups, tfsSearch]);
+
   const chartData: ChartPoint[] = useMemo(
-    () => tfsGroups.slice(0, CHART_LIMIT).map(g => ({
+    () => visibleGroups.slice(0, CHART_LIMIT).map(g => ({
       tfsNumber: g.tfsNumber,
       count:     g.count,
       types:     g.types,
       incNums:   g.incNums,
     })),
-    [tfsGroups]
+    [visibleGroups]
   );
 
-  const total   = tfsGroups.reduce((s, g) => s + g.count, 0);
+  const total = visibleGroups.reduce((s, g) => s + g.count, 0);
   const loading = cipLoading || tfsLoading;
 
   // ── Filter helpers ──────────────────────────────────────────────────────────
@@ -340,7 +348,8 @@ export default function CIPsByTypePage() {
     selectedType   !== "All" ||
     selectedClient !== "All" ||
     fromDate !== DEFAULT_FROM ||
-    !!toDate;
+    !!toDate ||
+    !!tfsSearch;
 
   const resetFilters = () => {
     setSelectedStatuses([]);
@@ -348,6 +357,7 @@ export default function CIPsByTypePage() {
     setSelectedClient("All");
     setFromDate(DEFAULT_FROM);
     setToDate("");
+    setTfsSearch("");
   };
 
   const toggleStatus = (s: string) =>
@@ -549,6 +559,32 @@ export default function CIPsByTypePage() {
         {/* Right: dropdowns + chart + table */}
         <div className="flex-1 min-w-0 space-y-5">
 
+          {/* TFS number search */}
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search TFS number… e.g. TFS-81725 or 81725"
+              value={tfsSearch}
+              onChange={e => setTfsSearch(e.target.value)}
+              disabled={loading}
+              className="w-full bg-[#1a1f2e] border border-gray-700 text-white text-sm rounded-lg pl-10 pr-10 py-2.5 focus:outline-none focus:border-amber-500 placeholder:text-gray-600 disabled:opacity-50"
+            />
+            {tfsSearch && (
+              <button
+                onClick={() => setTfsSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-red-400 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+
           {/* Dropdown filters */}
           <div className="flex flex-wrap gap-4">
             <div className="flex flex-col gap-1 min-w-0 flex-1">
@@ -646,9 +682,13 @@ export default function CIPsByTypePage() {
               <div className="h-80 flex flex-col items-center justify-center gap-3 text-gray-600">
                 <svg className="w-10 h-10 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round"
-                    d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+                    d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
                 </svg>
-                <span className="text-sm">No records match the selected filters</span>
+                <span className="text-sm">
+                  {tfsSearch
+                    ? `No TFS records match "${tfsSearch}"`
+                    : "No records match the selected filters"}
+                </span>
                 {hasActiveFilters && (
                   <button onClick={resetFilters}
                     className="text-xs text-amber-400 hover:text-amber-300 underline underline-offset-2">
@@ -665,9 +705,9 @@ export default function CIPsByTypePage() {
                   {total.toLocaleString()} total
                 </span>
               </div>
-              {tfsGroups.length > CHART_LIMIT && (
+              {visibleGroups.length > CHART_LIMIT && (
                 <p className="text-xs text-gray-600 mb-3">
-                  Top {CHART_LIMIT} of {tfsGroups.length} TFS records shown · see table below for all
+                  Top {CHART_LIMIT} of {visibleGroups.length} TFS records shown · see table below for all
                 </p>
               )}
               <ResponsiveContainer width="100%" height={380}>
@@ -709,7 +749,7 @@ export default function CIPsByTypePage() {
           )}
 
           {/* TFS Breakdown table — expandable rows */}
-          {!loading && tfsGroups.length > 0 && (
+          {!loading && visibleGroups.length > 0 && (
             <div className="bg-[#111827] rounded-2xl border border-gray-800 overflow-hidden">
               <div className="flex items-center justify-between px-5 py-3 border-b border-gray-800 bg-gray-900/50">
                 <h3 className="text-sm font-semibold text-white">TFS Breakdown</h3>
@@ -719,7 +759,7 @@ export default function CIPsByTypePage() {
                       sample data
                     </span>
                   )}
-                  <span className="text-xs text-gray-500">{tfsGroups.length} records</span>
+                  <span className="text-xs text-gray-500">{visibleGroups.length} records</span>
                 </div>
               </div>
 
@@ -742,7 +782,7 @@ export default function CIPsByTypePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800/60">
-                  {tfsGroups.map((row, i) => {
+                  {visibleGroups.map((row, i) => {
                     const pct     = total > 0 ? (row.count / total) * 100 : 0;
                     const isOpen  = expandedRows.has(row.tfsNumber);
                     const isNoTFS = row.tfsNumber === "(No TFS Linked)";
