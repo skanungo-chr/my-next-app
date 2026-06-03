@@ -9,12 +9,13 @@ interface TypeOption   { value: string; label: string; }
 
 export interface CIPFilterBarProps {
   // Filter state
-  filterStatus:    string[];
-  filterType:      string[];
-  filterClient:    string;
-  filterEmergency: boolean;
-  dateRange:       DateRange;
-  syncFromYear:    string;
+  filterStatus:         string[];
+  filterType:           string[];
+  filterClient:         string;
+  filterEmergency:      boolean;
+  filterEnvironments:   string[];
+  dateRange:            DateRange;
+  syncFromYear:         string;
 
   // Dropdown options
   statusOptions:  StatusOption[];
@@ -36,13 +37,14 @@ export interface CIPFilterBarProps {
   lastSynced:    string | null;
 
   // Filter handlers
-  onFilterStatusChange:   (v: string[]) => void;
-  onFilterTypeChange:     (v: string[]) => void;
-  onFilterClientChange:   (v: string)   => void;
-  onFilterEmergencyToggle: ()           => void;
-  onDateRangeChange:      (v: DateRange) => void;
-  onSyncFromYearChange:   (v: string)   => void;
-  onClearFilters:         ()            => void;
+  onFilterStatusChange:       (v: string[]) => void;
+  onFilterTypeChange:         (v: string[]) => void;
+  onFilterClientChange:       (v: string)   => void;
+  onFilterEmergencyToggle:    ()            => void;
+  onFilterEnvironmentsChange: (v: string[]) => void;
+  onDateRangeChange:          (v: DateRange) => void;
+  onSyncFromYearChange:       (v: string)   => void;
+  onClearFilters:             ()            => void;
 
   // Action handlers
   onSync:           () => void;
@@ -53,18 +55,20 @@ export interface CIPFilterBarProps {
 }
 
 export default function CIPFilterBar({
-  filterStatus, filterType, filterClient, filterEmergency,
+  filterStatus, filterType, filterClient, filterEmergency, filterEnvironments,
   dateRange, syncFromYear,
   statusOptions, typeOptions, uniqueClients, clientCounts,
   cipRecordsCount, filteredCount, cipLoading,
   isAdmin, syncing, seeding, syncProgress, syncSummary, lastSynced,
   onFilterStatusChange, onFilterTypeChange, onFilterClientChange,
-  onFilterEmergencyToggle, onDateRangeChange, onSyncFromYearChange,
+  onFilterEmergencyToggle, onFilterEnvironmentsChange,
+  onDateRangeChange, onSyncFromYearChange,
   onClearFilters, onSync, onExportCSV, onSeed, onDebug, onCheckProducts,
 }: CIPFilterBarProps) {
   const hasFilters =
     filterStatus.length > 0 || filterType.length > 0 ||
-    filterClient || filterEmergency || dateRange.from || dateRange.to;
+    filterClient || filterEmergency || filterEnvironments.length > 0 ||
+    dateRange.from || dateRange.to;
 
   return (
     <div className="sticky top-0 z-20 bg-[#0f1117] py-3 border-b border-white/10 -mx-6 px-6 mb-4">
@@ -86,6 +90,22 @@ export default function CIPFilterBar({
           options={typeOptions}
           value={filterType}
           onChange={onFilterTypeChange}
+        />
+
+        {/* Environment */}
+        <FilterDropdown
+          multi
+          label="Environment"
+          options={[
+            { value: "Development", label: "Development" },
+            { value: "Production",  label: "Production"  },
+            { value: "QA",          label: "QA"          },
+            { value: "Research",    label: "Research"    },
+            { value: "Staging",     label: "Staging"     },
+            { value: "Test",        label: "Test"        },
+          ]}
+          value={filterEnvironments}
+          onChange={onFilterEnvironmentsChange}
         />
 
         {/* All Clients */}

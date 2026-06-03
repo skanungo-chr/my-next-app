@@ -28,7 +28,17 @@ export interface CIPRecord {
   clientName: string;
   product: string;
   category: string;
+  environmentsImpacted: string[];
 }
+
+export const ENVIRONMENT_OPTIONS = [
+  "Development",
+  "Production",
+  "QA",
+  "Research",
+  "Staging",
+  "Test",
+] as const;
 
 async function getSiteId(token?: string | null): Promise<string> {
   const data = await graphFetch(
@@ -74,8 +84,7 @@ async function getListId(siteId: string, listName: string, token?: string | null
   return list.id;
 }
 
-// Include all known variants of the Product field name across different SharePoint list schemas.
-// Graph API silently ignores names that don't exist, so listing extras is safe.
+// Include all known variants of each field name — Graph API silently ignores unknown names.
 const FIELDS_SELECT = [
   "CHR_x0020_Ticket_x0020_Number_x0",
   "formStatus",
@@ -83,11 +92,18 @@ const FIELDS_SELECT = [
   "Submission_x0020_Date",
   "Emergency_x0020_Change_x0020__x0",
   "Change_x0020_Name",
-  "Product_x0020_and_x0020_Version",   // "Product and Version"
+  // Product field variants
+  "Product_x0020_and_x0020_Version",    // "Product and Version"
   "Product_x0020__x0026__x0020_Version", // "Product & Version"
-  "Product_x0020_Version",              // "Product Version"
-  "Product",                            // plain "Product"
-  "ProductandVersion",                  // no-space variant
+  "Product_x0020_Version",               // "Product Version"
+  "Product",                             // plain "Product"
+  "ProductandVersion",
+  // Environment(s) Impacted field variants
+  "Environment_x0028_s_x0029__x0020_Impacted", // "Environment(s) Impacted"
+  "Environments_x0020_Impacted",               // "Environments Impacted"
+  "Environment_x0020_Impacted",                // "Environment Impacted"
+  "EnvironmentsImpacted",
+  "Environments",
   "Category",
 ].join(",");
 
@@ -101,6 +117,22 @@ function extractText(val: unknown): string {
     return String(v).trim();
   }
   return String(val).trim();
+}
+
+/**
+ * Parse a SharePoint multi-select / multi-checkbox field into a string array.
+ * Handles: native arrays, ";#"-delimited strings, ";"-delimited, and ","-delimited.
+ */
+function extractMultiValue(val: unknown): string[] {
+  if (!val) return [];
+  if (Array.isArray(val)) return (val as unknown[]).map(String).map(s => s.trim()).filter(Boolean);
+  const str = typeof val === "string" ? val : String(val);
+  if (!str.trim()) return [];
+  // SharePoint legacy multi-value delimiter
+  if (str.includes(";#")) return str.split(";#").map(s => s.trim()).filter(Boolean);
+  if (str.includes(";"))  return str.split(";").map(s => s.trim()).filter(Boolean);
+  if (str.includes(","))  return str.split(",").map(s => s.trim()).filter(Boolean);
+  return [str.trim()];
 }
 
 type SPItem = {
@@ -119,6 +151,16 @@ function mapItem(item: SPItem): CIPRecord {
     f["ProductandVersion"] ??
     undefined
   );
+  // Try every known variant of the environment field name.
+  const environmentsImpacted = extractMultiValue(
+    f["Environment_x0028_s_x0029__x0020_Impacted"] ??
+    f["Environments_x0020_Impacted"] ??
+    f["Environment_x0020_Impacted"] ??
+    f["EnvironmentsImpacted"] ??
+    f["Environments"] ??
+    undefined
+  );
+
   return {
     id:               item.id,
     chrTicketNumbers: extractText(f["CHR_x0020_Ticket_x0020_Number_x0"]),
@@ -129,6 +171,7 @@ function mapItem(item: SPItem): CIPRecord {
     clientName:       extractText(f["Change_x0020_Name"]),
     product,
     category:         extractText(f["Category"]),
+    environmentsImpacted,
   };
 }
 

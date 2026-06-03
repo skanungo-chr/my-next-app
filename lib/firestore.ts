@@ -20,6 +20,10 @@ import { CIPRecord } from "@/lib/cip";
 
 function docToCIPRecord(d: { id: string; data: () => Record<string, unknown> }): CIPRecord {
   const data = d.data();
+  const raw = data.environmentsImpacted;
+  const environmentsImpacted: string[] = Array.isArray(raw)
+    ? (raw as unknown[]).map(String).filter(Boolean)
+    : [];
   return {
     id:               d.id,
     chrTicketNumbers: String(data.chrTicketNumbers ?? ""),
@@ -30,6 +34,7 @@ function docToCIPRecord(d: { id: string; data: () => Record<string, unknown> }):
     clientName:       String(data.clientName       ?? ""),
     product:          String(data.product          ?? ""),
     category:         String(data.category         ?? ""),
+    environmentsImpacted,
   };
 }
 
@@ -111,15 +116,16 @@ export async function upsertCIPRecords(
       batch.set(
         doc(db, "cip_records", record.id),
         {
-          chrTicketNumbers: record.chrTicketNumbers,
-          cipType:          record.cipType,
-          cipStatus:        record.cipStatus,
-          submissionDate:   record.submissionDate,
-          emergencyFlag:    record.emergencyFlag,
-          clientName:       record.clientName,
-          product:          record.product,
-          category:         record.category,
-          lastSyncedAt:     serverTimestamp(),
+          chrTicketNumbers:    record.chrTicketNumbers,
+          cipType:             record.cipType,
+          cipStatus:           record.cipStatus,
+          submissionDate:      record.submissionDate,
+          emergencyFlag:       record.emergencyFlag,
+          clientName:          record.clientName,
+          product:             record.product,
+          category:            record.category,
+          environmentsImpacted: record.environmentsImpacted ?? [],
+          lastSyncedAt:        serverTimestamp(),
         },
         { merge: true }
       );
