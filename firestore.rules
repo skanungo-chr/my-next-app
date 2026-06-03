@@ -33,13 +33,16 @@ service cloud.firestore {
       allow delete: if isAdmin() && resource.data.userId == request.auth.uid;
     }
 
-    // CIP records — any signed-in user can read.
-    // Writes are open because seed/sync run server-side via the Firebase client SDK,
-    // which has no request.auth context. Admin enforcement is done at the API/UI layer.
-    // To lock this down properly, migrate seed/sync to Firebase Admin SDK.
     // CIP records — reads open so server-side sync (unauthenticated) can diff records.
     // Writes open for same reason. Access control enforced at API/UI layer.
     match /cip_records/{recordId} {
+      allow read:  if true;
+      allow write: if true;
+    }
+
+    // Sync metadata (last sync timestamp written by handleSync after SharePoint fetch).
+    // Open read/write — only stores a timestamp, no sensitive data.
+    match /syncMetadata/{docId} {
       allow read:  if true;
       allow write: if true;
     }
