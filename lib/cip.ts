@@ -74,7 +74,22 @@ async function getListId(siteId: string, listName: string, token?: string | null
   return list.id;
 }
 
-const FIELDS_SELECT = "CHR_x0020_Ticket_x0020_Number_x0,formStatus,CIPStatuss,Submission_x0020_Date,Emergency_x0020_Change_x0020__x0,Change_x0020_Name,Product_x0020_and_x0020_Version,Category";
+// Include all known variants of the Product field name across different SharePoint list schemas.
+// Graph API silently ignores names that don't exist, so listing extras is safe.
+const FIELDS_SELECT = [
+  "CHR_x0020_Ticket_x0020_Number_x0",
+  "formStatus",
+  "CIPStatuss",
+  "Submission_x0020_Date",
+  "Emergency_x0020_Change_x0020__x0",
+  "Change_x0020_Name",
+  "Product_x0020_and_x0020_Version",   // "Product and Version"
+  "Product_x0020__x0026__x0020_Version", // "Product & Version"
+  "Product_x0020_Version",              // "Product Version"
+  "Product",                            // plain "Product"
+  "ProductandVersion",                  // no-space variant
+  "Category",
+].join(",");
 
 /** SharePoint can return choice fields as strings OR lookup fields as objects */
 function extractText(val: unknown): string {
@@ -90,29 +105,30 @@ function extractText(val: unknown): string {
 
 type SPItem = {
   id: string;
-  fields: {
-    CHR_x0020_Ticket_x0020_Number_x0?: unknown;
-    formStatus?: unknown;
-    CIPStatuss?: unknown;
-    Submission_x0020_Date?: unknown;
-    Emergency_x0020_Change_x0020__x0?: unknown;
-    Change_x0020_Name?: unknown;
-    Product_x0020_and_x0020_Version?: unknown;
-    Category?: unknown;
-  };
+  fields: Record<string, unknown>;
 };
 
 function mapItem(item: SPItem): CIPRecord {
+  const f = item.fields;
+  // Try every known variant of the product field name; use the first non-empty one.
+  const product = extractText(
+    f["Product_x0020_and_x0020_Version"] ??
+    f["Product_x0020__x0026__x0020_Version"] ??
+    f["Product_x0020_Version"] ??
+    f["Product"] ??
+    f["ProductandVersion"] ??
+    undefined
+  );
   return {
-    id: item.id,
-    chrTicketNumbers: extractText(item.fields.CHR_x0020_Ticket_x0020_Number_x0),
-    cipType:          extractText(item.fields.formStatus),
-    cipStatus:        extractText(item.fields.CIPStatuss),
-    submissionDate:   extractText(item.fields.Submission_x0020_Date),
-    emergencyFlag:    extractText(item.fields.Emergency_x0020_Change_x0020__x0) === "Yes",
-    clientName:       extractText(item.fields.Change_x0020_Name),
-    product:          extractText(item.fields.Product_x0020_and_x0020_Version),
-    category:         extractText(item.fields.Category),
+    id:               item.id,
+    chrTicketNumbers: extractText(f["CHR_x0020_Ticket_x0020_Number_x0"]),
+    cipType:          extractText(f["formStatus"]),
+    cipStatus:        extractText(f["CIPStatuss"]),
+    submissionDate:   extractText(f["Submission_x0020_Date"]),
+    emergencyFlag:    extractText(f["Emergency_x0020_Change_x0020__x0"]) === "Yes",
+    clientName:       extractText(f["Change_x0020_Name"]),
+    product,
+    category:         extractText(f["Category"]),
   };
 }
 
