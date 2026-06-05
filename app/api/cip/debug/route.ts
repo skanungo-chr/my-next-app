@@ -71,23 +71,53 @@ export async function GET(request: Request) {
       token
     ) as { value: { id: string; fields: Record<string, unknown> }[] };
 
+    const ENV_KNOWN = new Set(["development","production","qa","research","staging","test"]);
+    const KNOWN_PRODUCTS = ["OMNIA","Omnia360","OASIS FM","Advanced Customer Portal","Payment Processor","Report Writer","XML Invoice"];
+
     if (itemsData.value.length > 0) {
-      // Show first item's full fields
       steps.sampleItemFields = itemsData.value[0].fields;
-      // Extract product-related fields across all 5 records
-      const KNOWN_PRODUCTS = ["OMNIA", "Omnia360", "OASIS FM", "Advanced Customer Portal", "Payment Processor", "Report Writer", "XML Invoice"];
+
+      // Product field discovery
       steps.productFieldSearch = itemsData.value.map((item) => {
-        const productFields: Record<string, unknown> = {};
+        const hit: Record<string, unknown> = {};
         for (const [key, val] of Object.entries(item.fields)) {
-          const strVal = String(val ?? "");
-          if (
-            key.toLowerCase().includes("product") ||
-            KNOWN_PRODUCTS.some((p) => strVal.toLowerCase().includes(p.toLowerCase()))
-          ) {
-            productFields[key] = val;
+          const s = String(val ?? "");
+          if (key.toLowerCase().includes("product") ||
+              KNOWN_PRODUCTS.some(p => s.toLowerCase().includes(p.toLowerCase()))) {
+            hit[key] = val;
           }
         }
-        return { id: item.id, productFields };
+        return { id: item.id, productFields: hit };
+      });
+
+      // Environment field discovery — three strategies
+      const envColumnNames = (columnsData.value as SharePointColumn[])
+        .filter(c => c.displayName.toLowerCase().includes("environment") ||
+                     c.name.toLowerCase().includes("environment"))
+        .map(c => ({ internalName: c.name, displayName: c.displayName }));
+
+      steps.environmentColumnNames = envColumnNames.length > 0
+        ? envColumnNames
+        : "No columns with 'environment' in the name were found.";
+
+      steps.environmentFieldSearch = itemsData.value.map((item) => {
+        const hit: Record<string, unknown> = {};
+        for (const [key, val] of Object.entries(item.fields)) {
+          const s = String(val ?? "").toLowerCase();
+          // Match by key name containing "environment" / "impacted"
+          if (key.toLowerCase().includes("environment") || key.toLowerCase().includes("impacted")) {
+            hit[key] = val;
+          }
+          // Match by value containing known environment strings
+          if (!hit[key] && val && s.split(/[;,|]/).map(x => x.trim()).every(x => ENV_KNOWN.has(x))) {
+            hit[key] = val;
+          }
+        }
+        // Also check separate boolean columns
+        for (const env of ["Development","Production","QA","Research","Staging","Test"]) {
+          if (item.fields[env] !== undefined) hit[env] = item.fields[env];
+        }
+        return { id: item.id, environmentFields: hit };
       });
     } else {
       steps.sampleItemFields = "No items in list";
@@ -95,10 +125,13 @@ export async function GET(request: Request) {
 
     // Step 6: Show current field mapping
     steps.currentMapping = {
-      "Title → chrTicketNumbers": "Title (CHR Ticket Numbers)",
-      "CIPType → cipType": "CIPType",
-      "CIPStatus → cipStatus": "CIPStatus",
-      "SubmissionDate → submissionDate": "SubmissionDate",
+      "CHR_x0020_Ticket_x0020_Number_x0 → chrTicketNumbers": "CHR Ticket Number",
+      "formStatus → cipType": "CIP Type",
+      "CIPStatuss → cipStatus": "CIP Status",
+      "Submission_x0020_Date → submissionDate": "Submission Date",
+      "Change_x0020_Name → clientName": "Client Name",
+      "Product (variant) → product": "Product",
+      "Environment (auto-detected) → environmentsImpacted": "Environment(s) Impacted",
     };
 
     return NextResponse.json({ success: true, steps });

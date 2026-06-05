@@ -84,7 +84,10 @@ async function getListId(siteId: string, listName: string, token?: string | null
   return list.id;
 }
 
-// Include all known variants of each field name — Graph API silently ignores unknown names.
+// Core fields we always need — used with $select for efficiency.
+// Environment field is intentionally EXCLUDED from this list because
+// the actual SharePoint internal name is unknown; we fetch ALL fields
+// and discover it at runtime in extractEnvironments().
 const FIELDS_SELECT = [
   "CHR_x0020_Ticket_x0020_Number_x0",
   "formStatus",
@@ -92,20 +95,19 @@ const FIELDS_SELECT = [
   "Submission_x0020_Date",
   "Emergency_x0020_Change_x0020__x0",
   "Change_x0020_Name",
-  // Product field variants
-  "Product_x0020_and_x0020_Version",    // "Product and Version"
-  "Product_x0020__x0026__x0020_Version", // "Product & Version"
-  "Product_x0020_Version",               // "Product Version"
-  "Product",                             // plain "Product"
+  // Product field variants (all silently ignored if wrong)
+  "Product_x0020_and_x0020_Version",
+  "Product_x0020__x0026__x0020_Version",
+  "Product_x0020_Version",
+  "Product",
   "ProductandVersion",
-  // Environment(s) Impacted field variants
-  "Environment_x0028_s_x0029__x0020_Impacted", // "Environment(s) Impacted"
-  "Environments_x0020_Impacted",               // "Environments Impacted"
-  "Environment_x0020_Impacted",                // "Environment Impacted"
-  "EnvironmentsImpacted",
-  "Environments",
   "Category",
 ].join(",");
+
+// Known environment values for value-based field detection.
+const ENV_VALUES = new Set(
+  ["development", "production", "qa", "research", "staging", "test"]
+);
 
 /** SharePoint can return choice fields as strings OR lookup fields as objects */
 function extractText(val: unknown): string {
@@ -140,9 +142,71 @@ type SPItem = {
   fields: Record<string, unknown>;
 };
 
+/**
+ * Multi-strategy environment field extraction.
+ *
+ * Strategy 1 — explicit name variants: tries every known encoding of
+ *   "Environment(s) Impacted" / "Environments Impacted" etc.
+ * Strategy 2 — boolean columns: SharePoint sometimes models each
+ *   environment as a separate Yes/No column (Development, Production …).
+ * Strategy 3 — value scan: scans ALL returned fields and treats any
+ *   whose parsed values are all known environment strings as the field.
+ *
+ * Because the URL no longer uses $select for environment, all SharePoint
+ * fields are returned, so Strategy 3 will always find the right one even
+ * if the internal name was completely unknown.
+ */
+function extractEnvironments(fields: Record<string, unknown>): string[] {
+  // Strategy 1 — known multi-value field name variants
+  const MULTI_VARIANTS = [
+    "Environment_x0028_s_x0029__x0020_Impacted", // "Environment(s) Impacted"
+    "Environments_x0020_Impacted",               // "Environments Impacted"
+    "Environment_x0020_Impacted",                // "Environment Impacted"
+    "EnvironmentsImpacted",
+    "Environments",
+    "Environment",
+    "EnvironmentImpacted",
+    "EnvironmentsAffected",
+    "Environment_x0020_Impact",
+    "Impacted_x0020_Environments",
+  ];
+  for (const name of MULTI_VARIANTS) {
+    const raw = fields[name];
+    if (raw !== undefined && raw !== null && raw !== "") {
+      const vals = extractMultiValue(raw);
+      if (vals.length > 0) return vals;
+    }
+  }
+
+  // Strategy 2 — separate Yes/No boolean columns per environment
+  const boolHits: string[] = [];
+  for (const env of ["Development", "Production", "QA", "Research", "Staging", "Test"]) {
+    const v = fields[env] ?? fields[env.toUpperCase()];
+    if (v === true || v === "Yes" || v === "1" || v === 1) boolHits.push(env);
+  }
+  if (boolHits.length > 0) return boolHits;
+
+  // Strategy 3 — value-based scan: any field whose values are exclusively
+  // known environment names is assumed to be the environment field.
+  for (const [key, val] of Object.entries(fields)) {
+    // Skip system / metadata columns
+    if (!val || key === "Title" || key === "ID" || key === "id" ||
+        key.startsWith("@") || key.startsWith("_")) continue;
+    const parsed = extractMultiValue(val);
+    if (
+      parsed.length > 0 &&
+      parsed.every(v => ENV_VALUES.has(v.toLowerCase()))
+    ) {
+      return parsed;
+    }
+  }
+
+  return [];
+}
+
 function mapItem(item: SPItem): CIPRecord {
   const f = item.fields;
-  // Try every known variant of the product field name; use the first non-empty one.
+
   const product = extractText(
     f["Product_x0020_and_x0020_Version"] ??
     f["Product_x0020__x0026__x0020_Version"] ??
@@ -151,27 +215,18 @@ function mapItem(item: SPItem): CIPRecord {
     f["ProductandVersion"] ??
     undefined
   );
-  // Try every known variant of the environment field name.
-  const environmentsImpacted = extractMultiValue(
-    f["Environment_x0028_s_x0029__x0020_Impacted"] ??
-    f["Environments_x0020_Impacted"] ??
-    f["Environment_x0020_Impacted"] ??
-    f["EnvironmentsImpacted"] ??
-    f["Environments"] ??
-    undefined
-  );
 
   return {
-    id:               item.id,
-    chrTicketNumbers: extractText(f["CHR_x0020_Ticket_x0020_Number_x0"]),
-    cipType:          extractText(f["formStatus"]),
-    cipStatus:        extractText(f["CIPStatuss"]),
-    submissionDate:   extractText(f["Submission_x0020_Date"]),
-    emergencyFlag:    extractText(f["Emergency_x0020_Change_x0020__x0"]) === "Yes",
-    clientName:       extractText(f["Change_x0020_Name"]),
+    id:                  item.id,
+    chrTicketNumbers:    extractText(f["CHR_x0020_Ticket_x0020_Number_x0"]),
+    cipType:             extractText(f["formStatus"]),
+    cipStatus:           extractText(f["CIPStatuss"]),
+    submissionDate:      extractText(f["Submission_x0020_Date"]),
+    emergencyFlag:       extractText(f["Emergency_x0020_Change_x0020__x0"]) === "Yes",
+    clientName:          extractText(f["Change_x0020_Name"]),
     product,
-    category:         extractText(f["Category"]),
-    environmentsImpacted,
+    category:            extractText(f["Category"]),
+    environmentsImpacted: extractEnvironments(f),
   };
 }
 
@@ -209,7 +264,13 @@ export async function fetchCIPRecordsPage(
     const fromDate = FETCH_FROM_YEARS[fromYear ?? "2025"] ?? FETCH_FROM_YEARS["2025"];
     const dateFilter = `fields/Submission_x0020_Date ge '${fromDate}'`;
     const folderFilter = `fields/ContentType ne 'Folder'`;
-    url = `/sites/${siteId}/lists/${listId}/items?$expand=fields($select=${FIELDS_SELECT})&$filter=${folderFilter} and ${dateFilter}&$orderby=fields/Submission_x0020_Date desc&$top=25`;
+    // NOTE: We intentionally do NOT use $select on fields here.
+    // Using $select requires knowing the exact internal field name for every column.
+    // For fields whose internal name is unknown (e.g. Environment(s) Impacted),
+    // $select silently returns nothing. Fetching all fields lets mapItem/extractEnvironments
+    // discover the correct field by value-matching regardless of its internal name.
+    // The extra data per record (~50 fields vs ~12) is acceptable for a sync workload.
+    url = `/sites/${siteId}/lists/${listId}/items?$expand=fields&$filter=${folderFilter} and ${dateFilter}&$orderby=fields/Submission_x0020_Date desc&$top=25`;
   }
 
   const page = await graphFetch(url, token) as { value: SPItem[]; "@odata.nextLink"?: string };
