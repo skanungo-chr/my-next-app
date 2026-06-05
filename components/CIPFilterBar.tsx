@@ -12,7 +12,6 @@ export interface CIPFilterBarProps {
   filterStatus:         string[];
   filterType:           string[];
   filterClient:         string;
-  filterEmergency:      boolean;
   filterEnvironments:   string[];
   dateRange:            DateRange;
   syncFromYear:         string;
@@ -40,7 +39,6 @@ export interface CIPFilterBarProps {
   onFilterStatusChange:       (v: string[]) => void;
   onFilterTypeChange:         (v: string[]) => void;
   onFilterClientChange:       (v: string)   => void;
-  onFilterEmergencyToggle:    ()            => void;
   onFilterEnvironmentsChange: (v: string[]) => void;
   onDateRangeChange:          (v: DateRange) => void;
   onSyncFromYearChange:       (v: string)   => void;
@@ -55,19 +53,19 @@ export interface CIPFilterBarProps {
 }
 
 export default function CIPFilterBar({
-  filterStatus, filterType, filterClient, filterEmergency, filterEnvironments,
+  filterStatus, filterType, filterClient, filterEnvironments,
   dateRange, syncFromYear,
   statusOptions, typeOptions, uniqueClients, clientCounts,
   cipRecordsCount, filteredCount, cipLoading,
   isAdmin, syncing, seeding, syncProgress, syncSummary, lastSynced,
   onFilterStatusChange, onFilterTypeChange, onFilterClientChange,
-  onFilterEmergencyToggle, onFilterEnvironmentsChange,
+  onFilterEnvironmentsChange,
   onDateRangeChange, onSyncFromYearChange,
   onClearFilters, onSync, onExportCSV, onSeed, onDebug, onCheckProducts,
 }: CIPFilterBarProps) {
   const hasFilters =
     filterStatus.length > 0 || filterType.length > 0 ||
-    filterClient || filterEmergency || filterEnvironments.length > 0 ||
+    filterClient || filterEnvironments.length > 0 ||
     dateRange.from || dateRange.to;
 
   return (
@@ -135,20 +133,7 @@ export default function CIPFilterBar({
         {/* Date Range */}
         <DateRangeFilter value={dateRange} onChange={onDateRangeChange} />
 
-        {/* Emergency toggle */}
-        <button
-          onClick={onFilterEmergencyToggle}
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors ${
-            filterEmergency
-              ? "bg-red-600/20 border-red-500/50 text-red-400"
-              : "bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600 hover:text-white"
-          }`}
-        >
-          <span className={`w-2 h-2 rounded-full ${filterEmergency ? "bg-red-400" : "bg-gray-500"}`} />
-          Emergency
-        </button>
-
-        {/* Record count badge */}
+{/* Record count badge */}
         {cipRecordsCount > 0 && (
           <span className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors ${
             filteredCount === cipRecordsCount

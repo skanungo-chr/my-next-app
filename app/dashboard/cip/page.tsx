@@ -42,7 +42,6 @@ export default function CIPPage() {
   const [filterStatus, setFilterStatus]             = useState<string[]>([]);
   const [filterType, setFilterType]                 = useState<string[]>([]);
   const [filterClient, setFilterClient]             = useState<string>("");
-  const [filterEmergency, setFilterEmergency]       = useState(false);
   const [filterEnvironments, setFilterEnvironments] = useState<string[]>([]);
   const [dateRange, setDateRange]       = useState<DateRange>({ from: "", to: "" });
   const [debugResult, setDebugResult]   = useState<string | null>(null);
@@ -104,7 +103,7 @@ export default function CIPPage() {
   };
 
   // Reset to page 1 whenever filters change
-  useEffect(() => { setPage(1); }, [filterStatus, filterType, filterClient, filterEmergency, filterEnvironments, dateRange]);
+  useEffect(() => { setPage(1); }, [filterStatus, filterType, filterClient, filterEnvironments, dateRange]);
 
   const authHeaders = (): Record<string, string> =>
     msAccessToken ? { Authorization: `Bearer ${msAccessToken}` } : {};
@@ -244,14 +243,13 @@ export default function CIPPage() {
     const matchStatus    = filterStatus.length > 0 ? filterStatus.some((s) => r.cipStatus.toLowerCase() === s.toLowerCase()) : true;
     const matchType      = filterType.length > 0 ? filterType.some((t) => r.cipType.toLowerCase() === t.toLowerCase()) : true;
     const matchClient    = filterClient ? r.clientName === filterClient : true;
-    const matchEmergency = filterEmergency ? r.emergencyFlag === true : true;
     const matchEnv       = filterEnvironments.length > 0
       ? filterEnvironments.some((e) => (r.environmentsImpacted ?? []).some((ei) => ei.toLowerCase() === e.toLowerCase()))
       : true;
     const recDate        = r.submissionDate ? r.submissionDate.slice(0, 10) : "";
     const matchFrom      = dateRange.from  ? recDate >= dateRange.from : true;
     const matchTo        = dateRange.to    ? recDate <= dateRange.to   : true;
-    return matchStatus && matchType && matchClient && matchEmergency && matchEnv && matchFrom && matchTo;
+    return matchStatus && matchType && matchClient && matchEnv && matchFrom && matchTo;
   });
 
   const sortedCIP = [...filteredCIP].sort((a, b) => {
@@ -298,7 +296,6 @@ export default function CIPPage() {
         filterStatus={filterStatus}
         filterType={filterType}
         filterClient={filterClient}
-        filterEmergency={filterEmergency}
         filterEnvironments={filterEnvironments}
         dateRange={dateRange}
         syncFromYear={syncFromYear}
@@ -318,7 +315,6 @@ export default function CIPPage() {
         onFilterStatusChange={setFilterStatus}
         onFilterTypeChange={setFilterType}
         onFilterClientChange={(v) => { setFilterClient(v); setPage(1); }}
-        onFilterEmergencyToggle={() => { setFilterEmergency((x) => !x); setPage(1); }}
         onFilterEnvironmentsChange={(v) => { setFilterEnvironments(v); setPage(1); }}
         onDateRangeChange={setDateRange}
         onSyncFromYearChange={setSyncFromYear}
@@ -326,7 +322,6 @@ export default function CIPPage() {
           setFilterStatus([]);
           setFilterType([]);
           setFilterClient("");
-          setFilterEmergency(false);
           setFilterEnvironments([]);
           setDateRange({ from: "", to: "" });
         }}
@@ -393,7 +388,7 @@ export default function CIPPage() {
               </svg>
             ),
             color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20",
-            onClick: () => { setFilterEmergency(true); setPage(1); },
+            onClick: undefined,
           },
           {
             label: "This Month",
