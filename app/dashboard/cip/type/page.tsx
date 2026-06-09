@@ -31,15 +31,17 @@ async function fetchTFSForChart(months: number): Promise<TFSItemLight[]> {
   if (!pat || !TFS_URL) throw Object.assign(new Error("NO_PAT"), { code: "NO_PAT" });
 
   const auth       = `Basic ${btoa(`:${pat}`)}`;
+  // Use CreatedDate (not ChangedDate) so TFS items created within the window are always
+  // included regardless of whether they've been modified recently.
   const dateClause = months > 0
     ? (() => {
         const d = new Date();
         d.setMonth(d.getMonth() - months);
-        return ` AND [System.ChangedDate] >= '${d.toISOString().slice(0, 10)}'`;
+        return ` AND [System.CreatedDate] >= '${d.toISOString().slice(0, 10)}'`;
       })()
     : "";
 
-  const wiql    = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${TFS_PROJ}'${dateClause} ORDER BY [System.ChangedDate] DESC`;
+  const wiql    = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${TFS_PROJ}'${dateClause} ORDER BY [System.CreatedDate] DESC`;
   const wiqlUrl = `${TFS_URL}/${TFS_COL}/${TFS_PROJ}/_apis/wit/wiql?api-version=${TFS_VER}`;
 
   let res: Response;
@@ -210,7 +212,7 @@ export default function CIPsByTypePage() {
     setTfsLoading(true);
     setTfsError(null);
     try {
-      const items = await fetchTFSForChart(12); // last 12 months by default
+      const items = await fetchTFSForChart(24); // last 24 months — catches items created in 2025 that haven't been modified recently
       setTfsItems(items);
       setLastSynced(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
     } catch (e) {
