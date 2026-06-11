@@ -213,12 +213,14 @@ function mapItem(item: SPItem): CIPRecord {
     f["Product_x0020_and_x0020_Version"] ??
     f["Product_x0020__x0026__x0020_Version"] ??
     f["Product_x0020_Version"] ??
+    f["Product_x0020_and_x0020_Module"] ??
     f["Product"] ??
     f["ProductandVersion"] ??
     undefined
   );
 
   const softwareVersion = extractText(
+    f["Product_x0020_and_x0020_Module"] ??
     f["Software_x0020_Version_x0028_s_x0029_"] ??
     f["SoftwareVersions"] ??
     f["Software_x0020_Versions"] ??
