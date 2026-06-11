@@ -29,6 +29,8 @@ export interface CIPRecord {
   product: string;
   category: string;
   environmentsImpacted: string[];
+  softwareVersion?: string;
+  productVersion?: string;
 }
 
 export const ENVIRONMENT_OPTIONS = [
@@ -216,6 +218,21 @@ function mapItem(item: SPItem): CIPRecord {
     undefined
   );
 
+  const softwareVersion = extractText(
+    f["Software_x0020_Version_x0028_s_x0029_"] ??
+    f["SoftwareVersions"] ??
+    f["Software_x0020_Versions"] ??
+    f["Software_x0020_Version"] ??
+    f["SoftwareVersion"] ??
+    undefined
+  );
+
+  const productVersion = extractText(
+    f["Product_x0020__x002d__x0020_Version"] ??
+    f["ProductVersion"] ??
+    undefined
+  );
+
   return {
     id:                  item.id,
     chrTicketNumbers:    extractText(f["CHR_x0020_Ticket_x0020_Number_x0"]),
@@ -227,6 +244,8 @@ function mapItem(item: SPItem): CIPRecord {
     product,
     category:            extractText(f["Category"]),
     environmentsImpacted: extractEnvironments(f),
+    softwareVersion,
+    productVersion,
   };
 }
 

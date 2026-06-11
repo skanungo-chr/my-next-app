@@ -35,6 +35,8 @@ function docToCIPRecord(d: { id: string; data: () => Record<string, unknown> }):
     product:          String(data.product          ?? ""),
     category:         String(data.category         ?? ""),
     environmentsImpacted,
+    softwareVersion:  String(data.softwareVersion  ?? ""),
+    productVersion:   String(data.productVersion   ?? ""),
   };
 }
 
@@ -125,6 +127,8 @@ export async function upsertCIPRecords(
           product:             record.product,
           category:            record.category,
           environmentsImpacted: record.environmentsImpacted ?? [],
+          softwareVersion:     record.softwareVersion ?? "",
+          productVersion:      record.productVersion  ?? "",
           lastSyncedAt:        serverTimestamp(),
         },
         { merge: true }
