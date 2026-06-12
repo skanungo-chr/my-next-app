@@ -23,16 +23,37 @@ function getActivePAT(): string {
 
 // Only fetch the two fields we need — keeps this much lighter than the TFS page
 const MINIMAL_FIELDS = "System.Id,Custom.IncidentID";
+const TFS_CACHE_KEY  = "tfs_chart_cache";
+const TFS_CACHE_TTL  = 5 * 60 * 1000; // 5 minutes
 
 interface TFSItemLight { id: number; incidentId: string; }
 
-async function fetchTFSForChart(months: number): Promise<TFSItemLight[]> {
+interface TFSCache { items: TFSItemLight[]; ts: number; }
+
+function readTFSCache(): TFSItemLight[] | null {
+  try {
+    const raw = sessionStorage.getItem(TFS_CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw) as TFSCache;
+    if (Date.now() - c.ts > TFS_CACHE_TTL) return null;
+    return c.items;
+  } catch { return null; }
+}
+
+function writeTFSCache(items: TFSItemLight[]) {
+  try { sessionStorage.setItem(TFS_CACHE_KEY, JSON.stringify({ items, ts: Date.now() })); }
+  catch { /* ignore quota errors */ }
+}
+
+async function fetchTFSForChart(
+  months: number,
+  onProgress?: (partial: TFSItemLight[]) => void,
+): Promise<TFSItemLight[]> {
   const pat = getActivePAT();
   if (!pat || !TFS_URL) throw Object.assign(new Error("NO_PAT"), { code: "NO_PAT" });
 
-  const auth       = `Basic ${btoa(`:${pat}`)}`;
-  // Use CreatedDate (not ChangedDate) so TFS items created within the window are always
-  // included regardless of whether they've been modified recently.
+  const auth = `Basic ${btoa(`:${pat}`)}`;
+
   const dateClause = months > 0
     ? (() => {
         const d = new Date();
@@ -41,7 +62,8 @@ async function fetchTFSForChart(months: number): Promise<TFSItemLight[]> {
       })()
     : "";
 
-  const wiql    = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${TFS_PROJ}'${dateClause} ORDER BY [System.CreatedDate] DESC`;
+  // Filter to only work items that actually have an IncidentID — cuts fetch volume dramatically
+  const wiql    = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${TFS_PROJ}' AND [Custom.IncidentID] <> ''${dateClause} ORDER BY [System.CreatedDate] DESC`;
   const wiqlUrl = `${TFS_URL}/${TFS_COL}/${TFS_PROJ}/_apis/wit/wiql?api-version=${TFS_VER}`;
 
   let res: Response;
@@ -65,21 +87,30 @@ async function fetchTFSForChart(months: number): Promise<TFSItemLight[]> {
   if (ids.length === 0) return [];
 
   const all: TFSItemLight[] = [];
-  for (let i = 0; i < ids.length; i += 200) {
-    const chunk = ids.slice(i, i + 200);
-    const url   = `${TFS_URL}/${TFS_COL}/${TFS_PROJ}/_apis/wit/workitems`
-      + `?ids=${chunk.join(",")}&fields=${MINIMAL_FIELDS}&errorPolicy=omit&api-version=${TFS_VER}`;
-    const r = await fetch(url, { headers: { Authorization: auth, Accept: "application/json" } });
-    if (!r.ok) break;
-    const d = await r.json() as { value?: { id: number; fields: Record<string, unknown> }[] };
-    for (const item of (d.value ?? [])) {
-      all.push({
+  // Fetch batches concurrently in groups of 5 to maximise throughput without hammering the API
+  const BATCH = 200;
+  const chunks: number[][] = [];
+  for (let i = 0; i < ids.length; i += BATCH) chunks.push(ids.slice(i, i + BATCH));
+
+  const CONCURRENT = 5;
+  for (let i = 0; i < chunks.length; i += CONCURRENT) {
+    const group = chunks.slice(i, i + CONCURRENT);
+    const results = await Promise.all(group.map(async (chunk) => {
+      const url = `${TFS_URL}/${TFS_COL}/${TFS_PROJ}/_apis/wit/workitems`
+        + `?ids=${chunk.join(",")}&fields=${MINIMAL_FIELDS}&errorPolicy=omit&api-version=${TFS_VER}`;
+      const r = await fetch(url, { headers: { Authorization: auth, Accept: "application/json" } });
+      if (!r.ok) return [];
+      const d = await r.json() as { value?: { id: number; fields: Record<string, unknown> }[] };
+      return (d.value ?? []).map(item => ({
         id:         item.id,
         incidentId: String(item.fields["Custom.IncidentID"] ?? "").trim(),
-      });
-    }
-    if (i + 200 < ids.length) await new Promise(r => setTimeout(r, 250));
+      }));
+    }));
+    for (const batch of results) all.push(...batch);
+    onProgress?.([...all]);
   }
+
+  writeTFSCache(all);
   return all;
 }
 
@@ -208,11 +239,23 @@ export default function CIPsByTypePage() {
     }
   }, []);
 
-  const loadTFS = useCallback(async () => {
+  const loadTFS = useCallback(async (bustCache = false) => {
     setTfsLoading(true);
     setTfsError(null);
+
+    // Serve from sessionStorage cache on first load (not on manual sync)
+    if (!bustCache) {
+      const cached = readTFSCache();
+      if (cached) {
+        setTfsItems(cached);
+        setLastSynced(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+        setTfsLoading(false);
+        return;
+      }
+    }
+
     try {
-      const items = await fetchTFSForChart(24); // last 24 months — catches items created in 2025 that haven't been modified recently
+      const items = await fetchTFSForChart(24, (partial) => setTfsItems([...partial]));
       setTfsItems(items);
       setLastSynced(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
     } catch (e) {
@@ -231,7 +274,7 @@ export default function CIPsByTypePage() {
 
   const handleSync = useCallback(async () => {
     setUsingMock(false);
-    await Promise.all([loadCIP(), loadTFS()]);
+    await Promise.all([loadCIP(), loadTFS(true)]);
   }, [loadCIP, loadTFS]);
 
   // ── Derived filter options ──────────────────────────────────────────────────
