@@ -392,7 +392,7 @@ function shortenVersion(name: string) {
 function TFSOverviewChart({ tfsItems, cipMap }: { tfsItems: TFSWorkItem[]; cipMap: Record<number, CIPRecord[]> }) {
   const [view, setView] = useState<"version" | "product">("version");
 
-  const excluded = new Set(["test case", "task", "time tracking", "qa time tracking"]);
+  const excluded = new Set(["test case", "task", "time tracking", "qa time tracking", "test suite"]);
 
   const versionData = useMemo(() => {
     const byVersion: Record<string, { tfsItems: number; incidents: number }> = {};
@@ -477,7 +477,7 @@ interface BuildGroup {
 
 function buildVersionGroups(tfsItems: TFSWorkItem[], cipMap: Record<number, CIPRecord[]>): BuildGroup[] {
   const byBuild: Record<string, BuildGroup> = {};
-  const excluded = new Set(["test case", "task", "time tracking", "qa time tracking"]);
+  const excluded = new Set(["test case", "task", "time tracking", "qa time tracking", "test suite"]);
   for (const item of tfsItems) {
     if (excluded.has(item.type.toLowerCase())) continue;
     const build = item.reportedVersion?.trim();
@@ -1042,7 +1042,7 @@ export default function TFSRecordsPage() {
     return ["All", ...[...set].sort()];
   }, [tfsItems]);
 
-  const EXCLUDED_TYPES = new Set(["test case", "task", "time tracking", "qa time tracking"]);
+  const EXCLUDED_TYPES = new Set(["test case", "task", "time tracking", "qa time tracking", "test suite"]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
