@@ -936,7 +936,6 @@ export default function TFSRecordsPage() {
   const [usedFallback, setUsedFallback]   = useState(false);
   const [fallbackReason, setFallbackReason] = useState("");
   const [dateRange, setDateRange]         = useState<DateRange>(() => monthsToDateRange(1));
-  const [activeMonths, setActiveMonths]   = useState<DateRangeMonths | null>(1);
   const [activeTab, setActiveTab]         = useState<"items" | "incidents">("items");
 
   // Filters (Work Items tab)
@@ -1058,28 +1057,23 @@ export default function TFSRecordsPage() {
       .sort((a, b) => b.id - a.id);
   }, [tfsItems, search, selectedType, selectedStatus, selectedBuild, cipLinkedOnly, cipMap]);
 
-  const kpi = useMemo(() => ({
-    total:   tfsItems.length,
-    closed:  tfsItems.filter(i => ["closed", "resolved"].includes(i.status.toLowerCase())).length,
-    active:  tfsItems.filter(i => ["active", "in progress"].includes(i.status.toLowerCase())).length,
-    bugs:    tfsItems.filter(i => i.type.toLowerCase() === "bug").length,
-    stories: tfsItems.filter(i => i.type.toLowerCase() === "user story").length,
-  }), [tfsItems]);
+  const kpi = useMemo(() => {
+    const relevant = tfsItems.filter(i => !EXCLUDED_TYPES.has(i.type.toLowerCase()));
+    return {
+      total:   relevant.length,
+      closed:  relevant.filter(i => ["closed", "resolved"].includes(i.status.toLowerCase())).length,
+      active:  relevant.filter(i => ["active", "in progress"].includes(i.status.toLowerCase())).length,
+      bugs:    relevant.filter(i => i.type.toLowerCase() === "bug").length,
+      stories: relevant.filter(i => i.type.toLowerCase() === "user story").length,
+    };
+  }, [tfsItems]);
 
   const hasFilters = search || selectedType !== "All" || selectedStatus !== "All" || selectedBuild !== "All" || cipLinkedOnly;
   const loading    = cipLoading || tfsLoading;
   const hasPAT     = !!TFS_ENV_PAT;
 
-  const handleMonthButton = (months: DateRangeMonths) => {
-    const range = monthsToDateRange(months);
-    setDateRange(range);
-    setActiveMonths(months);
-    doFetch(range, cipIdsRef.current);
-  };
-
   const handleDateRangeChange = (range: DateRange) => {
     setDateRange(range);
-    setActiveMonths(null);
     doFetch(range, cipIdsRef.current);
   };
 
