@@ -1058,7 +1058,7 @@ export default function TFSRecordsPage() {
   }, [tfsItems, search, selectedType, selectedStatus, selectedBuild, cipLinkedOnly, cipMap]);
 
   const kpi = useMemo(() => {
-    const relevant = tfsItems.filter(i => !EXCLUDED_TYPES.has(i.type.toLowerCase()));
+    const relevant = tfsItems.filter(i => ["bug", "user story"].includes(i.type.toLowerCase()));
     return {
       total:   relevant.length,
       closed:  relevant.filter(i => ["closed", "resolved"].includes(i.status.toLowerCase())).length,
