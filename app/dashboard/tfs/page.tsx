@@ -142,7 +142,7 @@ async function fetchTFSItemsByIds(ids: number[], auth: string): Promise<TFSWorkI
 async function fetchViaWIQL(range: DateRange, auth: string): Promise<TFSWorkItem[]> {
   const clauses: string[] = [];
   if (range.from) clauses.push(`[System.ChangedDate] >= '${range.from}'`);
-  if (range.to)   clauses.push(`[System.ChangedDate] <= '${range.to}T23:59:59'`);
+  if (range.to)   clauses.push(`[System.ChangedDate] <= '${range.to}'`);
   const dateClause = clauses.length ? ` AND ${clauses.join(" AND ")}` : "";
   const query = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${TFS_PROJECT}'${dateClause} ORDER BY [System.ChangedDate] DESC`;
   const baseWiqlUrl = `${TFS_URL}/${TFS_COLLECTION}/${TFS_PROJECT}/_apis/wit/wiql?api-version=${TFS_API_VER}`;
