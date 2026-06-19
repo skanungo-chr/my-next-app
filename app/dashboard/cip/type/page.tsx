@@ -7,6 +7,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from "recharts";
+import DateRangeFilter, { DateRange } from "@/components/DateRangeFilter";
 
 // ─── TFS config (same env vars as the TFS Records page) ──────────────────────
 
@@ -171,9 +172,8 @@ function statusBadge(s: string) {
   return STATUS_BADGE[s.toLowerCase()] ?? "bg-indigo-900/40 text-indigo-400 border-indigo-700/50";
 }
 
-const ORANGE       = "#f59e0b";
-const DEFAULT_FROM = "2025-01";
-const CHART_LIMIT  = 30;
+const ORANGE      = "#f59e0b";
+const CHART_LIMIT = 30;
 
 // ─── Custom tooltip ───────────────────────────────────────────────────────────
 
@@ -220,8 +220,7 @@ export default function CIPsByTypePage() {
   // Filters
   const [selectedType, setSelectedType]         = useState("All");
   const [selectedClient, setSelectedClient]     = useState("All");
-  const [fromDate, setFromDate]                 = useState(DEFAULT_FROM);
-  const [toDate, setToDate]                     = useState("");
+  const [dateRange, setDateRange]               = useState<DateRange>({ from: "", to: "" });
   const [tfsSearch, setTfsSearch]               = useState("");
 
   // ── Data loading ────────────────────────────────────────────────────────────
@@ -289,14 +288,6 @@ export default function CIPsByTypePage() {
     [cipRecords]
   );
 
-  const availableMonths = useMemo(() => {
-    const set = new Set<string>();
-    for (const r of cipRecords) {
-      if (r.submissionDate) set.add(r.submissionDate.slice(0, 7));
-    }
-    return [...set].sort();
-  }, [cipRecords]);
-
   // ── Filtered CIP records ────────────────────────────────────────────────────
 
   const filtered = useMemo(() => {
@@ -304,12 +295,12 @@ export default function CIPsByTypePage() {
     return cipRecords.filter(r => {
       const matchType   = selectedType   === "All" || r.cipType    === selectedType;
       const matchClient = selectedClient === "All" || r.clientName === selectedClient;
-      const recMonth    = r.submissionDate ? r.submissionDate.slice(0, 7) : "";
-      const matchFrom   = fromDate ? recMonth >= fromDate : true;
-      const matchTo     = toDate   ? recMonth <= toDate   : true;
+      const recDate     = r.submissionDate ? r.submissionDate.slice(0, 10) : "";
+      const matchFrom   = dateRange.from ? recDate >= dateRange.from : true;
+      const matchTo     = dateRange.to   ? recDate <= dateRange.to   : true;
       return matchType && matchClient && matchFrom && matchTo;
     });
-  }, [cipRecords, usingMock, selectedType, selectedClient, fromDate, toDate]);
+  }, [cipRecords, usingMock, selectedType, selectedClient, dateRange]);
 
   // ── Group CIP records by TFS work item (via Custom.IncidentID ↔ chrTicketNumbers) ──
 
@@ -384,15 +375,13 @@ export default function CIPsByTypePage() {
   const hasActiveFilters =
     selectedType   !== "All" ||
     selectedClient !== "All" ||
-    fromDate !== DEFAULT_FROM ||
-    !!toDate ||
+    !!(dateRange.from || dateRange.to) ||
     !!tfsSearch;
 
   const resetFilters = () => {
     setSelectedType("All");
     setSelectedClient("All");
-    setFromDate(DEFAULT_FROM);
-    setToDate("");
+    setDateRange({ from: "", to: "" });
     setTfsSearch("");
   };
 
@@ -402,12 +391,6 @@ export default function CIPsByTypePage() {
       next.has(tfsNumber) ? next.delete(tfsNumber) : next.add(tfsNumber);
       return next;
     });
-
-  const formatMonth = (ym: string) => {
-    const [y, m] = ym.split("-");
-    return new Date(Number(y), Number(m) - 1, 1)
-      .toLocaleString("default", { month: "short", year: "numeric" });
-  };
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -420,6 +403,7 @@ export default function CIPsByTypePage() {
           <p className="text-sm text-gray-500 mt-0.5">Incidents attached per TFS record</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
+          <DateRangeFilter value={dateRange} onChange={setDateRange} />
           {lastSynced && !tfsLoading && (
             <span className="text-xs text-gray-500">Synced {lastSynced}</span>
           )}
@@ -583,57 +567,6 @@ export default function CIPsByTypePage() {
                 ))}
               </select>
             </div>
-          </div>
-
-          {/* Date range */}
-          <div className="flex flex-wrap gap-4 items-end">
-            <div className="flex flex-col gap-1 min-w-0 flex-1">
-              <label className="text-xs text-gray-500 font-medium">
-                From Month
-                {fromDate === DEFAULT_FROM && (
-                  <span className="ml-1.5 text-[10px] text-amber-500/70 font-normal">(default: Jan 2025)</span>
-                )}
-              </label>
-              <select
-                value={fromDate}
-                onChange={e => setFromDate(e.target.value)}
-                disabled={cipLoading || usingMock}
-                className="bg-[#1a1f2e] border border-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 w-full disabled:opacity-50 cursor-pointer"
-              >
-                <option value="">(All time)</option>
-                {availableMonths.map(m => (
-                  <option key={m} value={m} className="bg-gray-900">{formatMonth(m)}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1 min-w-0 flex-1">
-              <label className="text-xs text-gray-500 font-medium">To Month</label>
-              <select
-                value={toDate}
-                onChange={e => setToDate(e.target.value)}
-                disabled={cipLoading || usingMock}
-                className="bg-[#1a1f2e] border border-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500 w-full disabled:opacity-50 cursor-pointer"
-              >
-                <option value="">(All)</option>
-                {availableMonths.map(m => (
-                  <option key={m} value={m} className="bg-gray-900">{formatMonth(m)}</option>
-                ))}
-              </select>
-            </div>
-            {(fromDate !== DEFAULT_FROM || toDate) && (
-              <div className="flex flex-col gap-1 shrink-0">
-                <label className="text-xs font-medium invisible">Reset</label>
-                <button
-                  onClick={() => { setFromDate(DEFAULT_FROM); setToDate(""); }}
-                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-400 border border-gray-700 hover:border-red-500/40 px-3 py-2 rounded-lg transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Reset dates
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Chart */}
