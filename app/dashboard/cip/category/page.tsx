@@ -359,16 +359,16 @@ export default function CIPsByCategoryPage() {
                   {grandTotal.toLocaleString()} total
                 </span>
               </div>
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={chartData} margin={{ top: 28, right: 16, left: 0, bottom: 90 }}>
+              <ResponsiveContainer width="100%" height={420}>
+                <BarChart data={chartData} margin={{ top: 28, right: 16, left: 0, bottom: 160 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
                   <XAxis
                     dataKey="product"
-                    tick={{ fill: "#9CA3AF", fontSize: 11 }}
+                    tick={{ fill: "#9CA3AF", fontSize: 10 }}
                     interval={0}
-                    angle={-35}
+                    angle={-55}
                     textAnchor="end"
-                    height={90}
+                    height={160}
                     tickLine={false}
                     axisLine={{ stroke: "#374151" }}
                   />
