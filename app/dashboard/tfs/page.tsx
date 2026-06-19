@@ -141,10 +141,10 @@ async function fetchTFSItemsByIds(ids: number[], auth: string): Promise<TFSWorkI
 
 async function fetchViaWIQL(range: DateRange, auth: string): Promise<TFSWorkItem[]> {
   const clauses: string[] = [];
-  if (range.from) clauses.push(`[System.ChangedDate] >= '${range.from}'`);
-  if (range.to)   clauses.push(`[System.ChangedDate] <= '${range.to}'`);
+  if (range.from) clauses.push(`[System.CreatedDate] >= '${range.from}'`);
+  if (range.to)   clauses.push(`[System.CreatedDate] <= '${range.to}'`);
   const dateClause = clauses.length ? ` AND ${clauses.join(" AND ")}` : "";
-  const query = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${TFS_PROJECT}'${dateClause} ORDER BY [System.ChangedDate] DESC`;
+  const query = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${TFS_PROJECT}'${dateClause} ORDER BY [System.CreatedDate] DESC`;
   const baseWiqlUrl = `${TFS_URL}/${TFS_COLLECTION}/${TFS_PROJECT}/_apis/wit/wiql?api-version=${TFS_API_VER}`;
 
   // Try POST first (no preflight issue when IIS CORS is properly configured)
