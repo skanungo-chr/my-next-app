@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { fetchCIPRecordsOnce } from "@/lib/firestore";
 import { CIPRecord } from "@/lib/cip";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import DateRangeFilter, { DateRange } from "@/components/DateRangeFilter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,14 @@ const DATE_RANGE_OPTIONS = [
 ] as const;
 
 type DateRangeMonths = typeof DATE_RANGE_OPTIONS[number]["months"];
+
+function monthsToDateRange(months: DateRangeMonths): DateRange {
+  if (months === 0) return { from: "", to: "" };
+  const to   = new Date();
+  const from = new Date();
+  from.setMonth(from.getMonth() - months);
+  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+}
 
 // ─── PAT helpers ──────────────────────────────────────────────────────────────
 
@@ -130,10 +139,11 @@ async function fetchTFSItemsByIds(ids: number[], auth: string): Promise<TFSWorkI
 
 // ─── Strategy 1: WIQL POST, fallback to GET with $wiql param ─────────────────
 
-async function fetchViaWIQL(months: DateRangeMonths, auth: string): Promise<TFSWorkItem[]> {
-  const dateClause = months > 0
-    ? (() => { const d = new Date(); d.setMonth(d.getMonth() - months); return ` AND [System.ChangedDate] >= '${d.toISOString().slice(0, 10)}'`; })()
-    : "";
+async function fetchViaWIQL(range: DateRange, auth: string): Promise<TFSWorkItem[]> {
+  const clauses: string[] = [];
+  if (range.from) clauses.push(`[System.ChangedDate] >= '${range.from}'`);
+  if (range.to)   clauses.push(`[System.ChangedDate] <= '${range.to}T23:59:59'`);
+  const dateClause = clauses.length ? ` AND ${clauses.join(" AND ")}` : "";
   const query = `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${TFS_PROJECT}'${dateClause} ORDER BY [System.ChangedDate] DESC`;
   const baseWiqlUrl = `${TFS_URL}/${TFS_COLLECTION}/${TFS_PROJECT}/_apis/wit/wiql?api-version=${TFS_API_VER}`;
 
@@ -166,7 +176,7 @@ async function fetchViaWIQL(months: DateRangeMonths, auth: string): Promise<TFSW
 // 2. CIP-linked IDs fallback (if WIQL still blocked)
 // CIP-linked IDs are always merged into whichever strategy succeeds.
 
-async function fetchAllTFSData(months: DateRangeMonths, cipIds: number[]): Promise<{
+async function fetchAllTFSData(range: DateRange, cipIds: number[]): Promise<{
   items: TFSWorkItem[];
   usedFallback: boolean;
   fallbackReason: string;
@@ -176,7 +186,7 @@ async function fetchAllTFSData(months: DateRangeMonths, cipIds: number[]): Promi
   const auth = buildAuthHeader(pat);
 
   const strategies: Array<{ name: string; fn: () => Promise<TFSWorkItem[]> }> = [
-    { name: "WIQL", fn: () => fetchViaWIQL(months, auth) },
+    { name: "WIQL", fn: () => fetchViaWIQL(range, auth) },
   ];
 
   const errors: string[] = [];
@@ -925,7 +935,8 @@ export default function TFSRecordsPage() {
   const [justRefreshed, setJustRefreshed] = useState(false);
   const [usedFallback, setUsedFallback]   = useState(false);
   const [fallbackReason, setFallbackReason] = useState("");
-  const [dateRange, setDateRange]         = useState<DateRangeMonths>(1);
+  const [dateRange, setDateRange]         = useState<DateRange>(() => monthsToDateRange(1));
+  const [activeMonths, setActiveMonths]   = useState<DateRangeMonths | null>(1);
   const [activeTab, setActiveTab]         = useState<"items" | "incidents">("items");
 
   // Filters (Work Items tab)
@@ -941,7 +952,7 @@ export default function TFSRecordsPage() {
   const cipIdsRef = useRef<number[]>([]);
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
-  const doFetch = useCallback(async (months: DateRangeMonths, cipIds: number[]) => {
+  const doFetch = useCallback(async (range: DateRange, cipIds: number[]) => {
     setTfsLoading(true);
     setTfsError(null);
     setErrorCode(null);
@@ -949,7 +960,7 @@ export default function TFSRecordsPage() {
     setFallbackReason("");
 
     try {
-      const { items, usedFallback: fb, fallbackReason: fr } = await fetchAllTFSData(months, cipIds);
+      const { items, usedFallback: fb, fallbackReason: fr } = await fetchAllTFSData(range, cipIds);
       setTfsItems(items);
       setUsedFallback(fb);
       setFallbackReason(fr);
@@ -984,17 +995,18 @@ export default function TFSRecordsPage() {
 
   // Load CIP records on mount, then fetch TFS
   useEffect(() => {
+    const initial = monthsToDateRange(1);
     fetchCIPRecordsOnce()
       .then(r => {
         setCipRecords(r);
         setCipLoading(false);
         const ids = extractCIPTFSIds(r);
         cipIdsRef.current = ids;
-        doFetch(1, ids);
+        doFetch(initial, ids);
       })
       .catch(() => {
         setCipLoading(false);
-        doFetch(1, []);
+        doFetch(initial, []);
       });
   }, [doFetch]);
 
@@ -1058,9 +1070,17 @@ export default function TFSRecordsPage() {
   const loading    = cipLoading || tfsLoading;
   const hasPAT     = !!TFS_ENV_PAT;
 
-  const handleDateRangeChange = (months: DateRangeMonths) => {
-    setDateRange(months);
-    doFetch(months, cipIdsRef.current);
+  const handleMonthButton = (months: DateRangeMonths) => {
+    const range = monthsToDateRange(months);
+    setDateRange(range);
+    setActiveMonths(months);
+    doFetch(range, cipIdsRef.current);
+  };
+
+  const handleDateRangeChange = (range: DateRange) => {
+    setDateRange(range);
+    setActiveMonths(null);
+    doFetch(range, cipIdsRef.current);
   };
 
   const handleRefresh = async () => {
@@ -1108,10 +1128,10 @@ export default function TFSRecordsPage() {
             <div className="flex rounded-lg border border-gray-700 overflow-hidden">
               {DATE_RANGE_OPTIONS.map(opt => (
                 <button key={opt.months}
-                  onClick={() => !loading && handleDateRangeChange(opt.months)}
+                  onClick={() => !loading && handleMonthButton(opt.months)}
                   disabled={loading}
                   className={`px-3 py-1.5 text-xs font-medium transition-colors border-r border-gray-700 last:border-r-0 disabled:cursor-not-allowed ${
-                    dateRange === opt.months
+                    activeMonths === opt.months
                       ? "bg-indigo-600 text-white"
                       : "bg-gray-900 text-gray-400 hover:bg-gray-800 hover:text-white"
                   }`}>
@@ -1119,6 +1139,7 @@ export default function TFSRecordsPage() {
                 </button>
               ))}
             </div>
+            <DateRangeFilter value={dateRange} onChange={handleDateRangeChange} />
           </div>
           {lastUpdated && (
             <span className={`text-xs transition-colors ${justRefreshed ? "text-green-400 font-medium" : "text-gray-500"}`}>
