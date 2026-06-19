@@ -1123,24 +1123,7 @@ export default function TFSRecordsPage() {
           <p className="text-sm text-gray-500 mt-0.5">Azure DevOps — Omnia360Suite Project</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 shrink-0">Show:</span>
-            <div className="flex rounded-lg border border-gray-700 overflow-hidden">
-              {DATE_RANGE_OPTIONS.map(opt => (
-                <button key={opt.months}
-                  onClick={() => !loading && handleMonthButton(opt.months)}
-                  disabled={loading}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors border-r border-gray-700 last:border-r-0 disabled:cursor-not-allowed ${
-                    activeMonths === opt.months
-                      ? "bg-indigo-600 text-white"
-                      : "bg-gray-900 text-gray-400 hover:bg-gray-800 hover:text-white"
-                  }`}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            <DateRangeFilter value={dateRange} onChange={handleDateRangeChange} />
-          </div>
+          <DateRangeFilter value={dateRange} onChange={handleDateRangeChange} />
           {lastUpdated && (
             <span className={`text-xs transition-colors ${justRefreshed ? "text-green-400 font-medium" : "text-gray-500"}`}>
               {justRefreshed ? "Updated!" : `Synced ${formatTime(lastUpdated)}`}
