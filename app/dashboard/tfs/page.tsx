@@ -178,6 +178,7 @@ async function fetchViaWIQL(range: DateRange, auth: string): Promise<TFSWorkItem
 
 async function fetchAllTFSData(range: DateRange, cipIds: number[]): Promise<{
   items: TFSWorkItem[];
+  rangeItems: TFSWorkItem[]; // only items matching the date filter — used for KPI
   usedFallback: boolean;
   fallbackReason: string;
 }> {
@@ -194,14 +195,14 @@ async function fetchAllTFSData(range: DateRange, cipIds: number[]): Promise<{
   for (const strategy of strategies) {
     try {
       const rangeItems = await strategy.fn();
-      // Merge CIP-linked IDs that might be outside the date range
+      // Merge CIP-linked IDs that might be outside the date range (for table/CIP view only)
       const byId = new Map(rangeItems.map(i => [i.id, i]));
       const missing = cipIds.filter(id => !byId.has(id));
       if (missing.length > 0) {
         const extra = await fetchTFSItemsByIds(missing, auth);
         for (const item of extra) byId.set(item.id, item);
       }
-      return { items: [...byId.values()], usedFallback: false, fallbackReason: "" };
+      return { items: [...byId.values()], rangeItems, usedFallback: false, fallbackReason: "" };
     } catch (err) {
       const e = err as Error & { code?: string };
       if (e.code === "INVALID_PAT" || e.code === "METHOD_NOT_ALLOWED") throw err;
@@ -211,7 +212,7 @@ async function fetchAllTFSData(range: DateRange, cipIds: number[]): Promise<{
 
   // All strategies failed — fall back to CIP-linked IDs only
   const fallbackItems = await fetchTFSItemsByIds(cipIds, auth);
-  return { items: fallbackItems, usedFallback: true, fallbackReason: errors.join(" | ") };
+  return { items: fallbackItems, rangeItems: fallbackItems, usedFallback: true, fallbackReason: errors.join(" | ") };
 }
 
 // ─── CIP helpers ──────────────────────────────────────────────────────────────
@@ -927,6 +928,7 @@ function CIPIncidentsPanel({
 export default function TFSRecordsPage() {
   const [cipRecords, setCipRecords]       = useState<CIPRecord[]>([]);
   const [tfsItems, setTfsItems]           = useState<TFSWorkItem[]>([]);
+  const [rangeItems, setRangeItems]       = useState<TFSWorkItem[]>([]);
   const [cipLoading, setCipLoading]       = useState(true);
   const [tfsLoading, setTfsLoading]       = useState(false);
   const [tfsError, setTfsError]           = useState<string | null>(null);
@@ -959,8 +961,9 @@ export default function TFSRecordsPage() {
     setFallbackReason("");
 
     try {
-      const { items, usedFallback: fb, fallbackReason: fr } = await fetchAllTFSData(range, cipIds);
+      const { items, rangeItems: ri, usedFallback: fb, fallbackReason: fr } = await fetchAllTFSData(range, cipIds);
       setTfsItems(items);
+      setRangeItems(ri);
       setUsedFallback(fb);
       setFallbackReason(fr);
       setLastUpdated(new Date());
@@ -1058,7 +1061,7 @@ export default function TFSRecordsPage() {
   }, [tfsItems, search, selectedType, selectedStatus, selectedBuild, cipLinkedOnly, cipMap]);
 
   const kpi = useMemo(() => {
-    const relevant = tfsItems.filter(i => ["bug", "user story"].includes(i.type.toLowerCase()));
+    const relevant = rangeItems.filter(i => ["bug", "user story"].includes(i.type.toLowerCase()));
     return {
       total:   relevant.length,
       closed:  relevant.filter(i => ["closed", "resolved"].includes(i.status.toLowerCase())).length,
@@ -1066,7 +1069,7 @@ export default function TFSRecordsPage() {
       bugs:    relevant.filter(i => i.type.toLowerCase() === "bug").length,
       stories: relevant.filter(i => i.type.toLowerCase() === "user story").length,
     };
-  }, [tfsItems]);
+  }, [rangeItems]);
 
   const hasFilters = search || selectedType !== "All" || selectedStatus !== "All" || selectedBuild !== "All" || cipLinkedOnly;
   const loading    = cipLoading || tfsLoading;
