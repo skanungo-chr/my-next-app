@@ -27,7 +27,7 @@ async function upsertRecords(records: CIPRecord[]): Promise<string[]> {
         {
           chrTicketNumbers: record.chrTicketNumbers,
           cipType: record.cipType,
-          cipStatus: record.cipStatus,
+          cipStatus: record.cipStatus === "Successful" ? "Approved" : record.cipStatus,
           submissionDate: record.submissionDate,
           emergencyFlag: record.emergencyFlag,
           clientName: record.clientName,
