@@ -221,7 +221,9 @@ export default function CIPPage() {
     closed:        "bg-gray-500",
   };
 
-  const uniqueStatuses = [...new Set(cipRecords.map((r) => r.cipStatus).filter(Boolean))];
+  const CIP_RECORDS_HIDDEN_STATUSES = new Set(["denied", "cancelled", "rolled back", "failed", "in progress"]);
+  const uniqueStatuses = [...new Set(cipRecords.map((r) => r.cipStatus).filter(Boolean))]
+    .filter((s) => !CIP_RECORDS_HIDDEN_STATUSES.has(s.toLowerCase()));
   const uniqueTypes    = [...new Set(cipRecords.map((r) => r.cipType).filter(Boolean))];
   const uniqueClients  = [...new Set(cipRecords.map((r) => r.clientName).filter(Boolean))].sort();
 
