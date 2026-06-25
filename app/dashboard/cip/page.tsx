@@ -221,7 +221,7 @@ export default function CIPPage() {
     closed:        "bg-gray-500",
   };
 
-  const CIP_RECORDS_HIDDEN_STATUSES = new Set(["cancelled", "rolled back", "failed", "in progress", "open", "closed"]);
+  const CIP_RECORDS_HIDDEN_STATUSES = new Set(["cancelled", "rolled back", "failed", "in progress", "open", "closed", "completed"]);
   const uniqueStatuses = [...new Set(cipRecords.map((r) => r.cipStatus).filter(Boolean))]
     .filter((s) => !CIP_RECORDS_HIDDEN_STATUSES.has(s.toLowerCase()));
   const uniqueTypes    = [...new Set(cipRecords.map((r) => r.cipType).filter(Boolean))];
