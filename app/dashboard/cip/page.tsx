@@ -130,7 +130,7 @@ export default function CIPPage() {
         page++;
         const res = await fetch("/api/sync/fetch", {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders() },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ nextLink, fromYear: syncFromYear }),
         });
         const text = await res.text();
@@ -185,7 +185,7 @@ export default function CIPPage() {
   const handleDebug = async () => {
     setDebugResult("Running...");
     try {
-      const res  = await fetch("/api/cip/debug", { headers: authHeaders() });
+      const res  = await fetch("/api/cip/debug");
       const data = await res.json();
       setDebugResult(JSON.stringify(data, null, 2));
     } catch (err) {
@@ -196,7 +196,7 @@ export default function CIPPage() {
   const handleCheckProducts = async () => {
     setDebugResult("Scanning SharePoint for Product field (fetching all fields, no $select)...");
     try {
-      const res  = await fetch("/api/cip/debug", { headers: authHeaders() });
+      const res  = await fetch("/api/cip/debug");
       const data = await res.json();
       if (!data.success) { setDebugResult(`Error: ${data.error ?? JSON.stringify(data.steps)}`); return; }
       const search = (data.steps?.productFieldSearch ?? []) as { id: string; productFields: Record<string, unknown> }[];
@@ -224,7 +224,9 @@ export default function CIPPage() {
   const CIP_RECORDS_HIDDEN_STATUSES = new Set(["cancelled", "rolled back", "failed", "in progress", "open", "closed", "completed"]);
   const uniqueStatuses = [...new Set(cipRecords.map((r) => r.cipStatus).filter(Boolean))]
     .filter((s) => !CIP_RECORDS_HIDDEN_STATUSES.has(s.toLowerCase()));
-  const uniqueTypes    = [...new Set(cipRecords.map((r) => r.cipType).filter(Boolean))];
+  const CIP_RECORDS_ALLOWED_TYPES = new Set(["software upgrade", "software database change", "component hot fix", "general software", "it - network or system"]);
+  const uniqueTypes = [...new Set(cipRecords.map((r) => r.cipType).filter(Boolean))]
+    .filter((t) => CIP_RECORDS_ALLOWED_TYPES.has(t.toLowerCase()));
   const uniqueClients  = [...new Set(cipRecords.map((r) => r.clientName).filter(Boolean))].sort();
 
   const statusOptions = uniqueStatuses.map((s) => ({
