@@ -29,6 +29,7 @@ export interface CIPRecord {
   product: string;
   category: string;
   environmentsImpacted: string[];
+  devOpsWorkItem: string;
   softwareVersion?: string;
   productVersion?: string;
 }
@@ -246,6 +247,7 @@ function mapItem(item: SPItem): CIPRecord {
     product,
     category:            extractText(f["Category"]),
     environmentsImpacted: extractEnvironments(f),
+    devOpsWorkItem:      extractText(f["DevOps_x0020_Work_x0020_Item"]),
     softwareVersion,
     productVersion,
   };

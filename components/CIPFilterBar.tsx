@@ -232,18 +232,6 @@ export default function CIPFilterBar({
           </div>
 
           {isAdmin && (
-            <button onClick={onSeed} disabled={seeding}
-              className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-xs px-3 py-2 rounded-lg transition-colors text-gray-400">
-              {seeding ? "Seeding..." : "Seed Data"}
-            </button>
-          )}
-          {isAdmin && (
-            <button onClick={onDebug}
-              className="bg-gray-700 hover:bg-gray-600 text-xs px-3 py-2 rounded-lg transition-colors text-gray-400">
-              Debug
-            </button>
-          )}
-          {isAdmin && (
             <button onClick={onCheckProducts}
               className="bg-gray-700 hover:bg-gray-600 text-xs px-3 py-2 rounded-lg transition-colors text-amber-400">
               Check SP Products

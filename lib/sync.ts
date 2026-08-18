@@ -33,6 +33,7 @@ async function upsertRecords(records: CIPRecord[]): Promise<string[]> {
           clientName: record.clientName,
           product: record.product,
           category: record.category,
+          devOpsWorkItem:  record.devOpsWorkItem  ?? "",
           softwareVersion: record.softwareVersion ?? "",
           productVersion:  record.productVersion  ?? "",
           lastSyncedAt: serverTimestamp(),
